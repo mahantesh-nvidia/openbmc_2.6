@@ -1,0 +1,55 @@
+#!/usr/bin/expect
+#
+# Get to the target board and verify we can login then reboot
+# before exiting. This is intended to boot the target board
+# with the new build products.
+#
+#  Requires following arguments be set:
+#   ipaddress : IP address or hostname of the remote target.
+#   password  : Password of root on the remote target.
+
+set timeout 10
+
+if {[llength $argv] != 2} {
+    # We give a message so the user know our syntax:
+    puts "usage: target-boot.exp ipaddress password"
+    exit 1
+}
+
+set ipaddress [lindex $argv 0];
+set password [lindex $argv 1];
+
+# Avoid putting junk in the user's file
+set ssh_args "-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+# Spawn the ssh process and submit the user and the address.
+spawn ssh $ssh_args root@$ipaddress
+
+expect {
+    timeout { send_user "\nFailed, no login prompt\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "RSA key fingerprint" { send "yes\r"; exp_continue }
+    "assword:"
+}
+
+# Send the password to login
+send "$password\r"
+
+expect {
+    timeout { send_user "\nFailed, could not login\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+# Send a dummy command
+send "hostname\r"
+
+expect {
+    timeout { send_user "\nFailed, to run command\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+send_user "\nTarget board ready\n"
+send "reboot\r"
+expect eof

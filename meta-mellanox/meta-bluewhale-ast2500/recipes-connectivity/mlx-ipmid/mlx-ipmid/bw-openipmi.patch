@@ -1,0 +1,4777 @@
+diff -ruN a/configure.ac b/configure.ac
+--- a/configure.ac	2018-06-27 14:55:45.602011000 -0400
++++ b/configure.ac	2018-06-27 15:05:54.284230000 -0400
+@@ -286,6 +286,17 @@
+ )
+ AC_SUBST([MELLANOX_DIR])
+ 
++MLXBW_DIR=
++AC_ARG_WITH(mlxbw,
++[  --with-mlxbw            Enable the Mellanox Bluewhale BMC.],
++    AC_DEFINE(MLX_IPMID, 1, [define to 1])
++    AM_CONDITIONAL([MLX_IPMID],[true])
++    AC_DEFINE(MLX_BW_IPMID, 1, [define to 1])
++    AM_CONDITIONAL([MLX_BW_IPMID],[true])
++    MLXBW_DIR=mlxbw
++)
++AC_SUBST([MLXBW_DIR])
++
+ AM_PROG_CC_C_O
+ AC_PROG_LIBTOOL
+ AC_STDC_HEADERS
+@@ -936,6 +947,7 @@
+ 	  lanserv/sdrcomp/Makefile
+ 	  lanserv/marvell-bmc/Makefile
+ 	  lanserv/mellanox/Makefile
++	  lanserv/mlxbw/Makefile
+ 	  sample/Makefile
+ 	  doc/Makefile
+ 	  man/Makefile
+diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
+--- a/lanserv/bmc_app.c	2018-06-27 14:56:09.561539000 -0400
++++ b/lanserv/bmc_app.c	2018-06-27 15:04:37.153719000 -0400
+@@ -46,7 +46,7 @@
+ 
+ #ifdef MLX_IPMID
+ #include <OpenIPMI/ipmi_mlx.h>
+-#endif
++#endif /* ifdef MLX_IPMID */
+ 
+ static void
+ handle_get_device_id(lmc_data_t    *mc,
+@@ -196,7 +196,7 @@
+ 
+     mc_new_event(dest_mc, 0x02, data);
+ }
+-#endif
++#endif /* ifdef MLX_IPMID */
+ 
+ void
+ watchdog_timeout(void *cb_data)
+@@ -214,7 +214,7 @@
+ 	// earlier, but don't SEGFAULT if it isn't
+ 	goto out;
+     }
+-#endif
++#endif /* ifndef MLX_IPMID */
+ 
+     if (! mc->watchdog_preaction_ran) {
+ 	struct timeval tv, now;
+@@ -254,7 +254,7 @@
+     mc->watchdog_running = 0; /* Stop the watchdog on a timeout */
+     mc->watchdog_expired |= (1 << IPMI_MC_WATCHDOG_GET_USE(mc));
+ 
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+     unsigned char status_led_run_str[32];
+     system("echo 1 > /bsp/leds/status/red/brightness");
+     system("echo 0 > /bsp/leds/status/green/brightness");
+@@ -265,32 +265,32 @@
+ 
+     /* set "IERR" if IPMI watchdog timeout expired */
+     system("echo 1 > /bsp/environment/cpu_status");
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 
+     switch (IPMI_MC_WATCHDOG_GET_ACTION(mc)) {
+     case IPMI_MC_WATCHDOG_ACTION_NONE:
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+         /*Uart to BMC*/
+         system("echo 0 > /bsp/reset/uart_sel");
+         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x6);
+ #else
+ 	set_sensor_bit(mc, sens, 0, 1, 0xc0, mc->watchdog_use & 0xf, 0xff, 1);
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 	break;
+ 
+     case IPMI_MC_WATCHDOG_ACTION_RESET:
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+         /*CPU Reset*/
+         system("echo 0 > /bsp/reset/cpu_reset_soft");
+         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x1);
+ #else
+ 	set_sensor_bit(mc, sens, 1, 1, 0xc1, mc->watchdog_use & 0xf, 0xff, 1);
+ 	bchan->hw_op(bchan, HW_OP_RESET);
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 	break;
+ 
+     case IPMI_MC_WATCHDOG_ACTION_POWER_DOWN:
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+         /*CPU Power-off*/
+         system("echo 0 > /bsp/reset/cpu_reset_hard");
+         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
+@@ -299,11 +299,11 @@
+ 	bchan->hw_op(bchan, HW_OP_POWEROFF);
+ 	if (bchan->stop_cmd)
+ 	    bchan->stop_cmd(bchan, 0);
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 	break;
+ 
+     case IPMI_MC_WATCHDOG_ACTION_POWER_CYCLE:
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+         /*CPU power cycle*/
+         system("echo 0 > /bsp/reset/cpu_reset_hard");
+         sleep(3);
+@@ -315,7 +315,7 @@
+ 	if (bchan->stop_cmd)
+ 	    bchan->stop_cmd(bchan, 0);
+ 	start_poweron_timer(mc);
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 	break;
+     }
+ 
+@@ -333,7 +333,7 @@
+ 	mc->watchdog_running = 0;
+ 	return;
+     }
+-#endif
++#endif /* ifndef  MLX_IPMID */
+     mc->watchdog_preaction_ran = 0;
+ 
+     /* Timeout is in tenths of a second, offset is in seconds */
+@@ -348,7 +348,7 @@
+ 	    tv.tv_usec = 0;
+ 	}
+     }
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+     unsigned char status_led_run_str[32]; 
+ 
+     if (mc->watchdog_running != 1) {
+@@ -356,18 +356,19 @@
+             system(status_led_run_str);
+     }
+     mc->sysinfo->stop_timer(mc->watchdog_timer);
+-#endif
+-    mc->watchdog_running = 1;
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
++    mc->watchdog_running = 1; 
+ #ifndef MLX_IPMID
+     mc->sysinfo->start_timer(mc->watchdog_timer, &tv);
+ #else
+     if (mc->sysinfo->start_timer(mc->watchdog_timer, &tv))
+         mc->sysinfo->log(mc->sysinfo, OS_ERROR, NULL,
+                          "Failed to reset watchdog timer");
+-
++#ifndef MLX_BW_IPMID
+     /* set "Presence detected" on IPMI watchdog start */
+     system("echo 128 > /bsp/environment/cpu_status");
+-#endif
++#endif /* ifndef MLX_BW_IPMID */
++#endif /* ifndef MLX_IPMID */ 
+ }
+ 
+ static void
+diff -ruN a/lanserv/bmc_sensor.c b/lanserv/bmc_sensor.c
+--- a/lanserv/bmc_sensor.c	2018-06-27 14:56:16.434393000 -0400
++++ b/lanserv/bmc_sensor.c	2018-06-27 15:04:43.472618000 -0400
+@@ -49,7 +49,7 @@
+ 
+ #ifdef MLX_IPMID
+ #include <OpenIPMI/ipmi_mlx.h>
+-#endif
++#endif /* ifdef MLX_IPMID */
+ 
+ static void sensor_poll(void *cb_data);
+ 
+@@ -299,7 +299,7 @@
+     *rdata_len = 3;
+ }
+ 
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+ static void 
+ status_led_control(unsigned char num,
+                    unsigned char direction,
+@@ -328,13 +328,13 @@
+         case MLX_PSU1_VIN_SENSOR_NUM:
+         case MLX_PSU2_VIN_SENSOR_NUM:
+         case MLX_A2D_1_8V_SENSOR_NUM:
+-            if (sprintf(status_led_run_str,"status_led.py 0x%02x %d 0x%02x\n",num, direction, type))
++          if (sprintf(status_led_run_str,"status_led.py 0x%02x %d 0x%02x\n",num, direction, type))
+                  system(status_led_run_str);
+-            break;
++          break;
+         default:
+-            break;
++          break;
+         }
+-        break;
++         break;
+     case IPMI_SENSOR_TYPE_CURRENT:
+         switch (num) {
+         case MLX_VCORE_UCD_CURR_SENSOR_NUM:
+@@ -368,8 +368,8 @@
+         break;
+     }
+ }
+-#endif
+-
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
++   
+ static void
+ do_event(lmc_data_t    *mc,
+ 	 sensor_t      *sensor,
+@@ -409,9 +409,9 @@
+     data[11] = byte2;
+     data[12] = byte3;
+ 
+-#ifdef MLX_IPMID
+-    status_led_control(sensor->num, direction, sensor->sensor_type);
+-#endif
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
++    status_led_control(sensor->num, direction, sensor->sensor_type); 
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 
+     mc_new_event(dest_mc, 0x02, data);
+ }
+@@ -1585,10 +1585,14 @@
+ 	int err;
+ 
+ 	err = sensor->poll(sensor->cb_data, &val, &errstr);
++
+ 	if (err) {
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)
+             if (sensor->enabled) {
+-                status_led_control(sensor->num, 0, sensor->sensor_type);
++#if !defined(MLX_BW_IPMID)
++             status_led_control(sensor->num, 0, sensor->sensor_type);
++#endif /* !defined(MLX_BW_IPMID) */
++
+                 sensor->enabled = 0;
+                 /* In case PSU1 or PSU2 is power-off/plugged-out add msg to the SEL */
+                 switch (sensor->num) {
+@@ -1636,7 +1640,7 @@
+                 default:
+                     break;
+                 }
+-            }
++        }
+             goto out_restart;
+ #else
+ 	    mc->sysinfo->log(mc->sysinfo, OS_ERROR, NULL,
+@@ -1646,10 +1650,10 @@
+ #endif /* MLX_IPMID */
+ 	    goto out_restart;
+ 	}
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+         else{
+             if (!sensor->enabled) {
+-                status_led_control(sensor->num, 1, sensor->sensor_type);
++              status_led_control(sensor->num, 1, sensor->sensor_type);
+                 sensor->enabled = 1;
+                 switch (sensor->num) {
+                 /* In case PSU1 or PSU2 is power-on add msg to the SEL */
+@@ -1673,7 +1677,7 @@
+                 }
+             }
+         }
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 	
+ 	if (sensor->event_reading_code == IPMI_EVENT_READING_TYPE_THRESHOLD) {
+ 	    if (val < 0)
+diff -ruN a/lanserv/bmc_storage.c b/lanserv/bmc_storage.c
+--- a/lanserv/bmc_storage.c	2018-06-27 14:56:20.840313000 -0400
++++ b/lanserv/bmc_storage.c	2018-06-27 15:04:50.745459000 -0400
+@@ -280,13 +280,13 @@
+ 	    chan->set_atn(chan, 1, IPMI_MC_EVBUF_FULL_INT_ENABLED(mc));
+     }
+ 
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+     if (mc->pef.pef_control & 0x1)
+         mlx_mc_pef_apply(mc, record_type, event);
+-#endif /* MLX_IPMID */
++#endif /*  defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ }
+ 
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+ void mlx_mc_pef_apply(lmc_data_t    *mc,
+                         unsigned char record_type,
+                         unsigned char event[13])
+@@ -319,21 +319,21 @@
+ 
+         if ((mc->pef.event_filter_table[i][2] & 0x10)
+             && (mc->pef.pef_action_global_control & 0x10)) /* OEM */
+-            system("echo 3 > /bsp/leds/status/amber/trigger");
++          system("echo 3 > /bsp/leds/status/amber/trigger");
+ 
+         if ((mc->pef.event_filter_table[i][2] & 0x2)
+             && (mc->pef.pef_action_global_control & 0x2))  /* Power-off */
+-            system("echo 0 > /bsp/reset/cpu_reset_hard");
++          system("echo 0 > /bsp/reset/cpu_reset_hard");
+ 
+         if ((mc->pef.event_filter_table[i][2] & 0x4)
+             && (mc->pef.pef_action_global_control & 0x4))  /* Reset */
+-            system("echo 0 > /bsp/reset/cpu_reset_soft");
++          system("echo 0 > /bsp/reset/cpu_reset_soft");
+ 
+         if ((mc->pef.event_filter_table[i][2] & 0x8)
+             && (mc->pef.pef_action_global_control & 0x8)) { /* Power cycle */
+-            system("echo 0 > /bsp/reset/cpu_reset_hard");
+-            sleep(3);
+-            system("echo 1 > /bsp/reset/cpu_reset_hard");
++          system("echo 0 > /bsp/reset/cpu_reset_hard");
++          sleep(3);
++          system("echo 1 > /bsp/reset/cpu_reset_hard");
+         }
+ 
+         if ((mc->pef.event_filter_table[i][2] & 0x20)
+@@ -356,7 +356,7 @@
+             continue;
+     }
+ }
+-#endif /* MLX_IPMID */
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 
+ static void
+ handle_get_sel_info(lmc_data_t    *mc,
+@@ -1800,7 +1800,7 @@
+ 	    *rdata_len = 1;
+ 	    goto out_unlock;
+ 	}
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+ #define MLX_FRU_HEADER_VERSION               0x1
+ #define MLX_FRU_HEADER_PRODUCT               0x1
+ #define MLX_FRU_PRODUCT_MANUFACTURER_LEN     0xc4 // &3f = 4
+@@ -1902,7 +1902,7 @@
+             rdata[19] = MLX_FRU_NO_PRODUCT_EXTRA_INFO;
+         }
+     }
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+     } else {
+ 	memcpy(rdata + 2, data + offset, count);
+     }
+diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
+--- a/lanserv/ipmi_sim.c	2018-06-27 14:56:29.152156000 -0400
++++ b/lanserv/ipmi_sim.c	2018-06-27 15:05:02.331234000 -0400
+@@ -92,7 +92,7 @@
+ #include <OpenIPMI/serserv.h>
+ #ifdef MLX_IPMID
+ #include <OpenIPMI/ipmi_types.h>
+-#endif
++#endif /* ifdef MLX_IPMID */
+ #include "emu.h"
+ #include <OpenIPMI/persist.h>
+ 
+@@ -101,10 +101,15 @@
+ #define BASE_CONF_STR SYSCONFDIR "/ipmi"
+ #ifdef MLX_IPMID
+ #define MLNX_CONF_FILE_EXT       ".hw"
++#ifndef MLX_BW_IPMID
+ static char *config_file = BASE_CONF_STR "/mellanox.lan.conf";
+ #else
++static char *config_file = BASE_CONF_STR "/mlxbw.lan.conf";
++#endif /* ifndef MLX_BW_IPMID */
++#else
+ static char *config_file = BASE_CONF_STR "/lan.conf";
+-#endif
++#endif  /* ifdef MLX_IPMID */
++
+ static const char *statedir = STATEDIR;
+ static char *command_string = NULL;
+ static char *command_file = NULL;
+@@ -340,7 +345,7 @@
+     }
+     return ipmi_fd;
+ }
+-#endif
++#endif /* MLX_IPMID */
+ 
+ static int
+ open_lan_fd(struct sockaddr *addr, socklen_t addr_len)
+@@ -389,9 +394,10 @@
+     lan->send_out = lan_send;
+     lan->gen_rand = gen_rand;
+ 
++
+     err = ipmi_lan_init(lan);
+     if (err) {
+-	fprintf(stderr, "Unable to init lan: 0x%x\n", err);
++      fprintf(stderr, "Unable to init lan: 0x%x\n", err);
+ 	exit(1);
+     }
+ 
+@@ -571,7 +577,7 @@
+ 
+     return 0;
+ }
+-#endif
++#endif /* MLX_IPMID */
+ 
+ static int
+ ser_channel_tmode_proto_init(void *info, channel_t *chan)
+@@ -673,11 +679,11 @@
+ {
+     serserv_data_t *ser = chan->chan_info;
+     switch(ser->channel.protocol_type) {
+-#ifdef MLX_IPMID
++#if defined (MLX_IPMID) && !defined (MLX_BW_IPMID)
+         case IPMI_CHANNEL_PROTOCOL_BT_v15:
+             return ser_channel_bt_proto_init(info, chan);
+             break;
+-#endif
++#endif /* defined (MLX_IPMID) && !defined (MLX_BW_IPMID) */
+         case IPMI_CHANNEL_PROTOCOL_TMODE:
+             return ser_channel_tmode_proto_init(info, chan);
+             break;
+@@ -1604,8 +1610,10 @@
+     sysinfo.sol = ipmi_mc_get_sol(mc);
+ 
+     if (read_config(&sysinfo, config_file, print_version))
++    {
++	fprintf(stderr, "read config fail\n");
+ 	exit(1);
+-
++    }
+     if (print_version)
+ 	exit(0);
+ 
+@@ -1618,7 +1626,7 @@
+     err = persist_init("mlx_ipmid", sysinfo.name, statedir);
+ #else
+     err = persist_init("ipmi_sim", sysinfo.name, statedir);
+-#endif
++#endif /* MLX_IPMID */
+     if (err) {
+ 	fprintf(stderr, "Unable to initialize persistence: %s\n",
+ 		strerror(err));
+@@ -1659,7 +1667,7 @@
+         strcat(command_file, MLNX_CONF_FILE_EXT);
+ #else
+         strcat(command_file, ".emu");
+-#endif
++#endif /* MLX_IPMID */
+ 	tf = fopen(command_file, "r");
+ 	if (!tf) {
+ 	    free(command_file);
+@@ -1756,13 +1764,13 @@
+ 	goto out;
+     }
+ 
+-#ifdef MLX_IPMID
++#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
+ /*Uart to CPU*/
+     system("echo 1 > /bsp/reset/uart_sel");
+ 
+ /*CPU go*/
+     system("echo 1 > /bsp/reset/cpu_reset_hard");
+-#endif
++#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+ 
+     data.os_hnd->operation_loop(data.os_hnd);
+     rv = 0;
+diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
+--- a/lanserv/Makefile.am	2018-06-27 14:56:33.336072000 -0400
++++ b/lanserv/Makefile.am	2018-06-27 15:05:15.168979000 -0400
+@@ -6,8 +6,8 @@
+ 
+ BUILD_CC = @BUILD_CC@
+ 
+-SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@ @MELLANOX_DIR@
+-DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc mellanox
++SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@ @MELLANOX_DIR@ @MLXBW_DIR@
++DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc mellanox mlxbw
+ 
+ AM_CFLAGS = -Wall -Wsign-compare -I$(top_srcdir)/include -DIPMI_CHECK_LOCKS \
+ 	$(OPENSSLINCS) -DPVERSION="\"$(PVERSION)\""
+diff -ruN a/lanserv/mlxbw/50-mlxbw-events.rules b/lanserv/mlxbw/50-mlxbw-events.rules
+--- a/lanserv/mlxbw/50-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/50-mlxbw-events.rules	2018-06-27 15:04:02.651394000 -0400
+@@ -0,0 +1,18 @@
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++
++
++SUBSYSTEM=="i2c", KERNEL=="6-0050", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add eeprom_fru %S %p"
++SUBSYSTEM=="i2c", KERNEL=="6-0050", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm eeprom_fru %S %p"
++SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add eeprom_bmc %S %p"
++SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm eeprom_bmc %S %p"
++
+diff -ruN a/lanserv/mlxbw/50-mlxbw-hwmon-events.rules b/lanserv/mlxbw/50-mlxbw-hwmon-events.rules
+--- a/lanserv/mlxbw/50-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/50-mlxbw-hwmon-events.rules	2018-07-24 16:51:52.543993000 -0400
+@@ -0,0 +1,65 @@
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# Temp Sensors
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_inlet %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_inlet %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci_inlet %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci_inlet %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add qsfp_inlet %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm qsfp_inlet %S %p"
++# VRD sensors
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a400.i2c-bus/i2c-11/11-0058/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add vrd %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a400.i2c-bus/i2c-11/11-0058/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm vrd %S %p"
++# fans
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a480.i2c-bus/i2c-13/13-002f/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a480.i2c-bus/i2c-13/13-002f/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan %S %p"
++# regulators
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001b/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_serdes_1p2v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001b/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_serdes_1p2v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001f/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_ddr_0p9v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001f/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_ddr_0p9v %S %p"
++# PCI current monitors
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_12v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_12v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0041/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_3p3v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0041/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_3p3v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0044/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_12v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0044/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_12v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0045/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_3p3v %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0045/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_3p3v %S %p"
++#MB Voltage monitor
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0020/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add mb_vmon %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0020/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm mb_vmon %S %p"
++# Bluefield voltage monitor
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0021/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_vmon %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0021/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_vmon %S %p"
++#resets
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_hard_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_hard_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_rs232_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_rs232_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add usb_phy_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm usb_phy_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add jtag_cs_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm jtag_cs_reset %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add clk_gen_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm clk_gen_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan_ctl_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan_ctl_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_bmc_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_bmc_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_skt_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_skt_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pwr_ctl_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pwr_ctl_sel %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fans_force_max %S %p"
++SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
+diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
+--- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/lancontrol	2018-07-03 07:34:19.544612000 -0400
+@@ -0,0 +1,295 @@
++#!/bin/sh
++
++#
++# Script for handling external LAN configuration from the
++# IPMI deamon.  This command is generally invoked by the mlx_ipmid
++# to get and set external LAN configuration parameters.
++#
++# It's parameters are:
++#
++#  lancontrol <device> get [parm [parm ...]]
++#  lancontrol <device> set|check [parm val [parm val ...]]
++#
++# where <device> is a network device (eth0, etc.) and parm is one of:
++#  ip_addr
++#  ip_addr_src
++#  mac_addr
++#  subnet_mask
++#  default_gw_ip_addr
++# These are config values out of the IPMI LAN config table that are
++# not IPMI-exclusive, they require setting external things.
++#
++# The output of the "get" is "<parm>:<value>" for each listed parm.
++# The output of the "set" is empty on success.  Error output goes to
++# standard out (so it can be captured in the simulator) and the program
++# returns an error.
++#
++# The IP address values are standard IP addresses in the form a.b.c.d.
++# The MAC addresses ar standard 6 octet xx:xx:xx:xx:xx:xx values.  The
++# only special one is ip_addr_src, which can be "dhcp" or "static".
++#
++# The "check" operation checks to see if a value is valid without
++# committing it.
++#
++
++tmp_ip_addr="0.0.0.0"
++tmp_netmask="0"
++tmp_gateway="0.0.0.0"
++tmp_ip_addr_src="dhcp"
++
++prog=$0
++
++device=$1
++if [ "x$device" = "x" ]; then
++    echo "No device given"
++    exit 1;
++fi
++shift
++
++op=$1
++if [ "x$op" = "x" ]; then
++    echo "No operation given"
++    exit 1
++fi
++shift
++
++do_get() {
++    while [ "x$1" != "x" ]; do
++	case $1 in
++	    ip_addr)
++		val=`ifconfig $device | grep '^ *inet addr:' | tr ':' ' ' | sed 's/.*inet addr \([0-9.]*\).*$/\1/'`
++		if [ "x$val" = "x" ]; then
++		    val="0.0.0.0"
++		fi
++		;;
++
++	    ip_addr_src)
++		if [ ! -f /etc/systemd/network/50-static.network ];  then
++			val="dhcp"
++		else
++			val="static"
++		fi
++		;;
++
++	    mac_addr)
++		val=`ifconfig $device | grep 'HWaddr' | sed 's/.*HWaddr \([0-9a-fA-F:]*\).*$/\1/'`
++		if [ "x$val" = "x" ]; then
++		    val="00:00:00:00:00:00"
++		fi
++		;;
++
++	    subnet_mask)
++		val=`ifconfig $device | grep '^ *inet addr:' | tr ':' ' ' | sed 's/.*Mask \([0-9.]*\).*$/\1/'`
++		if [ "x$val" = "x" ]; then
++		    val="0.0.0.0"
++		fi
++		;;
++
++	    default_gw_ip_addr)
++		val=`route -n | grep '^0\.0\.0\.0' | grep "$device\$" | tr ' ' '\t' | tr -s '\t' '\t' | cut -f 2`
++		if [ "x$val" = "x" ]; then
++		    val="0.0.0.0"
++		fi
++		;;
++
++	    default_gw_mac_addr)
++		val=`route -n | grep '^0\.0\.0\.0' | grep "$device\$" | tr ' ' '\t' | tr -s '\t' '\t' | cut -s -f 2`
++		if [ "x$val" = "x" ]; then
++		    val="00:00:00:00:00:00"
++		else
++		    ping -W 1 -c 1 $val >/dev/null 2>&1
++		    val=`arp -n $val | grep "($val)" | tr ' ' '\t' | tr -s '\t' '\t' | cut -f 4`
++		    if [ "x$val" = "x" -o "x$val" = 'x<incomplete>' ]; then
++			val="00:00:00:00:00:00"
++		    fi
++		fi
++		;;
++
++	    backup_gw_ip_addr)
++		val="0.0.0.0"
++		;;
++
++	    backup_gw_mac_addr)
++		val="00:00:00:00:00:00"
++		;;
++
++	    *)
++		echo "Invalid parameter: $1"
++		exit 1
++		;;
++	esac
++
++	echo "$1:$val"
++	shift
++    done
++}
++
++do_check() {
++	case $1 in
++	    ip_addr_src)
++		# We only support static and dhcp IP address sources
++		case $2 in
++		    static)
++			;;
++		    dhcp)
++			;;
++		    *)
++			echo "Invalid ip_addr_src: $2"
++			exit 1
++			;;
++		esac
++		;;
++
++		ip_addr | subnet_mask | default_gw_ip_addr)
++		if [ "$2" != "`echo $2 | grep -E [0-9]\{1,3\}[.][0-9]\{1,3\}[.][0-9]\{1,3\}[.][0-9]\{1,3\}`" ];
++			then
++			echo "Invalid value $2 for parameter $1"
++			exit 1
++		fi
++		;;
++
++		mac_addr)
++		if [ "$2" != "`echo $2 | grep -E [[:xdigit:]]\{1,2\}[:][[:xdigit:]]\{1,2\}[:][[:xdigit:]]\{1,2\}[:][[:xdigit:]]\{1,2\}[:][[:xdigit:]]\{1,2\}[:][[:xdigit:]]\{1,2\}`" ];
++			then
++			echo "Invalid value $2 for parameter $1"
++			exit 1
++		fi
++		;;
++
++	    *)
++		echo "Invalid parameter: $parm"
++		exit 1
++		;;
++	esac
++}
++
++mask2cidr() {
++	nbits=0
++	IFS=.
++	for dec in $1 ; do
++		case $dec in
++			255) let nbits+=8;;
++			254) let nbits+=7;;
++			252) let nbits+=6;;
++			248) let nbits+=5;;
++			240) let nbits+=4;;
++			224) let nbits+=3;;
++			192) let nbits+=2;;
++			128) let nbits+=1;;
++			0);;
++			*) echo "Error: $dec is not recognized"; exit 1
++		esac
++	done
++	echo "$nbits"
++}
++
++do_set() {
++	if [ "x$1" = "x" ]
++	then
++		echo "no parameters given for set command - fail"
++		exit 1
++	fi
++	while [ "x$1" != "x" ]; do
++		parm="$1"
++		shift
++		if [ "x$1" = "x" ]; then
++			echo "No value present for parameter $parm"
++			exit 1
++		fi
++		val="$1"
++		shift
++
++		do_check $parm $val
++
++		case $parm in
++			ip_addr)
++				echo $val > /tmp/ip_addr
++				;;
++
++			ip_addr_src)
++				if [ $val == "dhcp" ]; then
++					rm -rf /etc/systemd/network/50-static.network
++					systemctl stop systemd-networkd
++					systemctl start systemd-networkd
++				else
++					if [ ! -f /etc/systemd/network/50-static.network ]; then
++						echo [Match] >> /etc/systemd/network/50-static.network
++						echo Name=$device >> /etc/systemd/network/50-static.network
++					fi
++				fi
++				;;
++
++			subnet_mask)
++				echo $(mask2cidr $val) > /tmp/subnet_mask
++				;;
++
++			default_gw_ip_addr)
++				echo $val > /tmp/default_gw_ip_addr
++				;;
++
++			mac_addr)
++				if [ -f /etc/systemd/network/50-static.network ]; then
++					sed -i '/\b\(Link\|MACAddress\)\b/d' /etc/systemd/network/50-static.network
++					echo [Link] >> /etc/systemd/network/50-static.network
++					echo MACAddress="$val" >> /etc/systemd/network/50-static.network
++					if [ -f /tmp/ip_addr ] && [ -f /tmp/subnet_mask ] && [ -f /tmp/default_gw_ip_addr ]
++					then
++						ifconfig $device down
++						systemctl stop systemd-networkd
++						systemctl start systemd-networkd
++						ifconfig $device down
++					fi
++				else
++					sed -i '/\b\(Link\|MACAddress\)\b/d' /usr/lib/systemd/network/default.network
++					echo [Link] >> /usr/lib/systemd/network/default.network
++					echo MACAddress="$val" >> /usr/lib/systemd/network/default.network
++					ifconfig $device down
++					systemctl stop systemd-networkd
++					systemctl start systemd-networkd
++					ifconfig $device up
++				fi
++				;;
++
++			*)
++				echo "Invalid parameter: $1"
++				exit 1
++				;;
++		esac
++	done
++
++	if [ ! -f /tmp/ip_addr ] || [ ! -f /tmp/subnet_mask ] || [ ! -f /tmp/default_gw_ip_addr ]
++	then
++		echo "no enaugh parameters given - fail"
++	else
++		tmp_ip_addr="$(</tmp/ip_addr)"
++		tmp_netmask="$(</tmp/subnet_mask)"
++		tmp_gateway="$(</tmp/default_gw_ip_addr)"
++		rm /tmp/ip_addr
++		rm /tmp/subnet_mask
++		rm /tmp/default_gw_ip_addr
++		sed -i '/\b\(Network\|Address\|Gateway\)\b/d' /etc/systemd/network/50-static.network
++
++		echo [Network] >> /etc/systemd/network/50-static.network
++		echo Address="$tmp_ip_addr"/"$tmp_netmask" >> /etc/systemd/network/50-static.network
++		echo Gateway="$tmp_gateway" >> /etc/systemd/network/50-static.network
++		systemctl stop systemd-networkd
++		systemctl start systemd-networkd
++	fi
++}
++
++case $op in
++    get)
++	do_get $@
++	;;
++    set)
++	do_set $@
++	;;
++
++    check)
++	do_check $@
++	;;
++
++*)
++	echo "Unknown operation: $op"
++	exit 1
++esac
+diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
+--- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/Makefile.am	2018-06-27 15:04:02.656389000 -0400
+@@ -0,0 +1,24 @@
++AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
++pkglib_LTLIBRARIES = mlxbw.la
++
++mlxbw_la_SOURCES = mlxbw.c
++mlxbw_la_LDFLAGS = -module
++
++install-data-local:
++	$(INSTALL) -m 755 -d "$(DESTDIR)$(sysconfdir)/ipmi/"; \
++	$(INSTALL) -m 755 -d "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 644 $(srcdir)/mlxbw.lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/"; \
++	$(INSTALL) -m 644 $(srcdir)/mlxbw.hw "$(DESTDIR)$(sysconfdir)/ipmi/"; \
++	$(INSTALL) -m 775 $(srcdir)/lancontrol "$(DESTDIR)$(sysconfdir)/ipmi/"; \
++	$(INSTALL) -m 644 $(srcdir)/sdr.20.main "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/sel_set_log_size.sh "$(DESTDIR)$(bindir)"; \
++	$(INSTALL) -m 775 $(srcdir)/50-mlxbw-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/50-mlxbw-hwmon-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/mlxbw-hw-events.sh "$(DESTDIR)$(bindir)";
++
++uninstall-local:
++	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/mlxbw.lan.conf"
++	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/mlxbw.hw"
++	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/sdr.20.main"
++	-rm -f "$(DESTDIR)$(bindir)/sel_set_log_size.sh"
++	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
+diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
+--- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/mlxbw.c	2018-07-18 21:04:48.192014000 -0400
+@@ -0,0 +1,1577 @@
++/*
++ * mlxbw.c
++ *
++ * Mellanox Bluewhale BMC specific module for handling MC functions.
++ *
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <string.h>
++#include <sys/time.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++#include <signal.h>
++#include <pthread.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <semaphore.h>
++#include <stdlib.h>
++
++#include <OpenIPMI/ipmi_err.h>
++#include <OpenIPMI/ipmi_msgbits.h>
++#include <OpenIPMI/ipmi_bits.h>
++#include <OpenIPMI/ipmi_mc.h>
++#include <OpenIPMI/serv.h>
++#include <OpenIPMI/ipmi_mlx.h>
++#include "../bmc.h"
++
++static lmc_data_t *bmc_mc;
++static unsigned char all_fans_failure = 0;
++
++/**************************************************************************
++ *                  Mellanox custom commands codes                        *
++ *************************************************************************/
++/* IPMI_SENSOR_EVENT_NETFN (0x04) */
++#define IPMI_OEM_MLX_SET_FAN_SPEED_CMD      0x30
++#define IPMI_OEM_MLX_GET_LED_STATE_CMD      0x31
++#define IPMI_OEM_MLX_SET_LED_STATE_CMD      0x32
++#define IPMI_OEM_MLX_SET_LED_BLINKING_CMD   0x33
++#define IPMI_OEM_MLX_GET_FAN_PWM_CMD        0x34
++#define IPMI_OEM_MLX_GET_TOTAL_POWER_CMD    0x35
++
++/* IPMI_APP_NETFN (0x06) */
++#define IPMI_OEM_MLX_SEL_BUFFER_SET_CMD     0x5B
++#define IPMI_OEM_MLX_CPU_READY_EVENT_CMD    0x5c
++#define IPMI_OEM_MLX_CPU_HARD_RESET_CMD     0x5e
++#define IPMI_OEM_MLX_CPU_SOFT_RESET_CMD     0x5f
++#define IPMI_OEM_MLX_RESET_PHY_CMD          0x60
++#define IPMI_OEM_MLX_SET_UART_TO_BMC_CMD    0x61
++#define IPMI_OEM_MLX_THERMAL_ALGORITHM_CMD  0x62
++#define IPMI_OEM_MLX_BMC_UPTIME_GET_CMD     0x63
++#define IPMI_OEM_MLX_LOG_TO_SEL_CMD         0x64
++
++#define IPMI_OEM_MLX_SEL_LOG_SIZE_MIN       0x40
++#define IPMI_OEM_MLX_SEL_LOG_SIZE_MAX       0x0fff
++
++/* Set sel log size script file path */
++#define SEL_SET_SCRIPT_NAME "sel_set_log_size.sh"
++
++/**  FAN FUNCTIONALITY DEFINES  **/
++#define MLX_FAN_MAX   8
++#define MLX_FAN_TACHO_FILE  "/bsp/fan/tacho"
++#define MLX_FAN_PWM_FILE            "/bsp/fan/pwm"
++#define MLX_FAN_PWM_ENABLE_FILE     "/bsp/fan/pwm_en"
++#define MLX_PWM_MIN                 0
++#define MLX_PWM_MAX                 9
++
++static const char* fan_tacho_en[MLX_FAN_MAX] =
++{
++    MLX_FAN_TACHO_FILE"1_en",
++    MLX_FAN_TACHO_FILE"2_en",
++    MLX_FAN_TACHO_FILE"3_en",
++    MLX_FAN_TACHO_FILE"4_en",
++    MLX_FAN_TACHO_FILE"5_en",
++    MLX_FAN_TACHO_FILE"6_en",
++    MLX_FAN_TACHO_FILE"7_en",
++    MLX_FAN_TACHO_FILE"8_en"
++};
++
++/**  LED FUNCTIONALITY DEFINES  **/
++#define LED_FAN_FILE "/bsp/leds/fan/"
++#define LED_STATUS_FILE "/bsp/leds/status/"
++#define LED_BRIGHTNESS "brightness"
++#define LED_TRIGGER    "trigger"
++#define LED_DELAY_OFF  "delay_off"
++#define LED_DELAY_ON   "delay_on"
++#define LED_TIMER      "timer"
++
++#define LED_COLOR_RED    1
++#define LED_COLOR_GREEN  2
++#define LED_COLOR_AMBER  3
++
++#define MLX_LED_BLINK_OFF 0
++#define MLX_LED_BLINK_3HZ 3
++#define MLX_LED_BLINK_6HZ 6
++
++/* Reset links */
++#define MLX_BMC_SOFT_RESET   "/bsp/reset/bmc_reset_soft"
++#define MLX_CPU_HARD_RESET   "/bsp/reset/cpu_reset_hard"
++#define MLX_CPU_SOFT_RESET   "/bsp/reset/cpu_reset_soft"
++#define MLX_SYS_HARD_RESET   "/bsp/reset/system_reset_hard"
++#define MLX_RESET_PHY        "/bsp/reset/reset_phy"
++
++#define MLX_UART_TO_BMC      "/bsp/reset/uart_sel"
++
++#define MLX_PSU_COUNT        2
++#define MLX_PSU_PIN_FILE     "/bsp/environment/psu%i_pin"
++
++/* number of thermal zones */
++#define MLX_MAX_THERMAL_ZONE 1
++#define MLX_THERMAL_ZONE     "/bsp/thermal/thermal_zone%u/mode"
++
++#define MLX_UPTIME_FILE      "/proc/uptime"
++
++#ifdef BLUEWHALE_RESET_CAUSE
++static const char* reset_cause[8] =
++{
++    "/bsp/reset/ac_power_cycle",
++    "/bsp/reset/dc_power_cycle",
++    "/bsp/reset/bmc_upgrade",
++    "/bsp/reset/cpu_kernel_panic",
++    "/bsp/reset/cpu_power_down",
++    "/bsp/reset/cpu_reboot",
++    "/bsp/reset/cpu_shutdown",
++    "/bsp/reset/cpu_watchdog"
++};
++
++enum reset_cause_e {
++    MLX_RESET_CAUSE_AC_POWER_CYCLE = 0,
++    MLX_RESET_CAUSE_DC_POWER_CYCLE,
++    MLX_RESET_CAUSE_BMC_UPGRADE,
++    MLX_RESET_CAUSE_CPU_KERNEL_PANIC,
++    MLX_RESET_CAUSE_CPU_POWER_DOWN,
++    MLX_RESET_CAUSE_CPU_REBOOT,
++    MLX_RESET_CAUSE_CPU_SHUTDOWN,
++    MLX_RESET_CAUSE_CPU_WATCHDOG,
++    MLX_RESET_CAUSE_BUTTON
++};
++#endif /* BLUEWHALE_RESET_CAUSE */
++
++/*
++ * This timer is called periodically to monitor the system reset cause.
++ */
++static ipmi_timer_t *reset_monitor_timer = NULL;
++#define MLX_RESET_MONITOR_TIMEOUT         10
++
++
++/*
++ * This timer is called periodically to monitor the FANs
++ */
++static ipmi_timer_t *fans_monitor_timer = NULL;
++#define MLX_FANS_MONITOR_TIMEOUT          5
++
++
++
++static unsigned char set_fan_enable(const char* fname)
++{
++    FILE *f_en;
++
++    printf("set_fan_enabled\n");
++    f_en = fopen(fname, "w");
++
++    if (!f_en) {
++            printf("\nUnable to open %s file", fname);
++            return IPMI_DESTINATION_UNAVAILABLE_CC;
++    } else
++        fprintf(f_en, "%u", 1);
++
++    fclose(f_en);
++
++    return 0;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x030  Speed (0x00-0xFF)
++ *
++**/
++static void
++handle_set_fan_speed_cmd (lmc_data_t    *mc,
++                msg_t         *msg,
++                unsigned char *rdata,
++                unsigned int  *rdata_len,
++                void          *cb_data)
++{
++    FILE *f_pwm;
++    unsigned char pwm = 0;
++
++    printf("set fan speed cmd\n");
++    return; 
++
++    pwm = msg->data[0];
++    if (pwm > MLX_PWM_MAX) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    f_pwm = fopen(MLX_FAN_PWM_FILE, "w");
++
++    if (!f_pwm) {
++            printf("\nUnable to open pwm file");
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else {
++        if (IPMI_DESTINATION_UNAVAILABLE_CC == set_fan_enable(MLX_FAN_PWM_ENABLE_FILE)) {
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else
++        fprintf(f_pwm, "%u", pwm);
++    }
++
++    fclose(f_pwm);
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x34
++ *
++**/
++static void
++handle_get_fan_pwm_cmd(lmc_data_t    *mc,
++                       msg_t         *msg,
++                       unsigned char *rdata,
++                       unsigned int  *rdata_len,
++                       void          *cb_data)
++{
++    unsigned char rv = 0;
++    char line_pwm[10];
++    int pwm;
++    FILE *fpwm;
++
++    printf("get_fan_pwm\n");
++    fpwm = fopen(MLX_FAN_PWM_FILE, "r");
++
++    if (!fpwm) {
++        printf("\nUnable to open  PWM file");
++        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++        *rdata_len = 1;
++	return;
++    }
++
++    if (0 >= fread(line_pwm, 1, sizeof(line_pwm),fpwm))
++    {
++        fclose(fpwm);
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++	return;
++    }
++
++    pwm = strtoul(line_pwm, NULL, 0);
++
++    fclose(fpwm);
++
++    rdata[0] = 0;
++    rdata[1] = pwm;
++    *rdata_len = 2;
++    return;
++}
++
++static unsigned char set_led_command(unsigned char led,
++                            unsigned char color,
++                            unsigned char cmd)
++{
++    FILE *fbrightness;
++    FILE *ftrigger;
++    char fname[100];
++    char cmd_trigger[100];
++
++    printf("set_led_cmd\n");
++    memset(fname, 0, sizeof(fname));
++    memset(cmd_trigger, 0, sizeof(cmd_trigger));
++
++    switch (color) {
++    case LED_COLOR_RED:
++        if (led <= sys_devices.status_led_number) {
++            if (cmd)
++                sprintf(cmd_trigger,"echo timer > %sred/%s\n",LED_STATUS_FILE, LED_TRIGGER);
++
++            sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++        }
++        else {
++            if (cmd)
++                sprintf(cmd_trigger,"echo timer > %sred/%u/%s\n",LED_FAN_FILE, led - sys_devices.status_led_number, LED_TRIGGER);
++
++            sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
++        }
++        break;
++    case LED_COLOR_GREEN:
++        if (led <= sys_devices.status_led_number) {
++            if (cmd)
++                sprintf(cmd_trigger,"echo timer > %sgreen/%s\n",LED_STATUS_FILE, LED_TRIGGER);
++
++            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++        }
++        else {
++            if (cmd)
++                sprintf(cmd_trigger,"echo timer > %sgreen/%u/%s\n",LED_FAN_FILE, led - sys_devices.status_led_number, LED_TRIGGER);
++
++            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
++        }
++        break;
++    case LED_COLOR_AMBER:
++        if (cmd)
++            sprintf(cmd_trigger,"echo timer > %samber/%s\n",LED_STATUS_FILE, LED_TRIGGER);
++
++        sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++        break;
++    default:
++        break;
++    }
++
++    fbrightness = fopen(fname, "w");
++
++    if (!fbrightness) {
++        fclose(fbrightness);
++        return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++    }
++
++    fprintf(fbrightness, "%u", cmd);
++    // system(cmd_trigger);
++
++    fclose(fbrightness);
++
++    return 0;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x32  LedNum  Color
++ *
++ * LedNum:
++ * 0x1 - status LED
++ * 0x2 - FAN1 LED
++ * 0x3 - FAN2 LED
++ * 0x4 - FAN2 LED
++ * 0x5 - FAN2 LED
++ *
++ * Color:
++ * 0x1 - red 0x2 - green 0x3 - amber
++**/
++static void
++handle_set_led_state(lmc_data_t    *mc,
++                     msg_t         *msg,
++                     unsigned char *rdata,
++                     unsigned int  *rdata_len,
++                     void          *cb_data)
++{
++    unsigned char rv = 0;
++    unsigned char led, color;
++
++    printf("set_led_state\n");
++    if (check_msg_length(msg, 2, rdata, rdata_len))
++        return;
++
++    led = msg->data[0];
++    if (led > sys_devices.status_led_number + sys_devices.fan_led_number ||
++        led == 0) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    color = msg->data[1];
++    if (color <  LED_COLOR_RED || color > LED_COLOR_AMBER) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    switch (color) {
++    case LED_COLOR_AMBER:
++        if (led > sys_devices.status_led_number) {
++            rv = IPMI_INVALID_DATA_FIELD_CC;
++            goto out;
++        }
++        rv = set_led_command(led, LED_COLOR_RED, 0);
++        if (rv)
++            goto out;
++        rv = set_led_command(led, LED_COLOR_GREEN, 0);
++        if (rv)
++            goto out;
++        rv = set_led_command(led, LED_COLOR_AMBER, 1);
++        if (rv)
++            goto out;
++        break;
++    case LED_COLOR_RED:
++        if (led <= sys_devices.status_led_number){
++            rv = set_led_command(led, LED_COLOR_AMBER, 0);
++            if (rv)
++                goto out;
++        }
++        rv = set_led_command(led, LED_COLOR_GREEN, 0);
++        if (rv)
++            goto out;
++        rv = set_led_command(led, LED_COLOR_RED, 1);
++        if (rv)
++            goto out;
++        break;
++    case LED_COLOR_GREEN:
++        if (led <= sys_devices.status_led_number) {
++            rv = set_led_command(led, LED_COLOR_AMBER, 0);
++            if (rv)
++                goto out;
++        }
++        rv = set_led_command(led, LED_COLOR_RED, 0);
++        if (rv)
++            goto out;
++        rv = set_led_command(led, LED_COLOR_GREEN, 1);
++        if (rv)
++            goto out;
++        break;
++    default:
++        break;
++    }
++
++ out:
++    rdata[0] = rv;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x33  LedNum  Color Time
++ *
++ * LedNum:
++ * 0x1 - status LED
++ * 0x2 - FAN1 LED
++ * 0x3 - FAN2 LED
++ * 0x4 - FAN2 LED
++ * 0x5 - FAN2 LED
++ *
++ * Color:
++ * 0x1 - red
++ * 0x2 - green
++ * 0x3 - amber 
++ *
++ * Time: 
++ * 0x0 - off blinking
++ * 0x3 - blinking 3HZ
++ * 0x6 - blinking 6HZ 
++ *
++ *  */ 
++static void
++handle_set_led_blinking (lmc_data_t    *mc,
++                msg_t         *msg,
++                unsigned char *rdata,
++                unsigned int  *rdata_len,
++                void          *cb_data)
++{
++    unsigned char led;
++    unsigned char time;
++    unsigned char color;
++    FILE *f_delayon;
++    FILE *f_delayoff;
++    char fname[100];
++
++    printf("set_led blink\n");
++    if (check_msg_length(msg, 3, rdata, rdata_len))
++        return;
++
++    led = msg->data[0];
++    color = msg->data[1];
++    time = msg->data[2];
++    if (led == 0 ||
++        led > sys_devices.status_led_number + sys_devices.fan_led_number || 
++        color > LED_COLOR_AMBER ||
++        color < LED_COLOR_RED ||
++        (time != MLX_LED_BLINK_OFF && 
++         time != MLX_LED_BLINK_3HZ && 
++         time != MLX_LED_BLINK_6HZ)) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    if (led <= sys_devices.status_led_number) {
++        switch (color) {
++        case LED_COLOR_RED:
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_DELAY_OFF);
++            f_delayoff = fopen(fname, "w");
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sred/%s", LED_STATUS_FILE,LED_DELAY_ON);
++            f_delayon = fopen(fname, "w");
++            break;
++        case LED_COLOR_GREEN:
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_DELAY_OFF);
++            f_delayoff = fopen(fname, "w");
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE,LED_DELAY_ON);
++            f_delayon = fopen(fname, "w");
++            break;
++        case LED_COLOR_AMBER:
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_DELAY_OFF);
++            f_delayoff = fopen(fname, "w");
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%samber/%s", LED_STATUS_FILE,LED_DELAY_ON);
++            f_delayon = fopen(fname, "w");
++            break;
++        default:
++            break;
++        }
++    }
++    else if (led > sys_devices.status_led_number && 
++             led < sys_devices.status_led_number + sys_devices.fan_led_number) {
++        switch (color) {
++        case LED_COLOR_RED:
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_DELAY_OFF);
++            f_delayoff = fopen(fname, "w");
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sred/%s", LED_FAN_FILE, led - sys_devices.status_led_number,LED_DELAY_ON);
++            f_delayon = fopen(fname, "w");
++            break;
++        case LED_COLOR_GREEN:
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_DELAY_OFF);
++            f_delayoff = fopen(fname, "w");
++            memset(fname, 0, sizeof(fname));
++            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number,LED_DELAY_ON);
++            f_delayon = fopen(fname, "w");
++            break;
++        default:
++            break;
++        }
++    }
++
++    if (!f_delayon || !f_delayoff) {
++        if (f_delayoff)
++            fclose(f_delayoff);
++        if (f_delayon)
++            fclose(f_delayon);
++
++        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    switch (time) {
++    case MLX_LED_BLINK_OFF:
++        fprintf(f_delayoff, "%u", 0);
++        fprintf(f_delayon, "%u", 0);
++        break;
++    case MLX_LED_BLINK_3HZ:
++        fprintf(f_delayoff, "%u", 83);
++        fprintf(f_delayon, "%u", 83);
++        break;
++    case MLX_LED_BLINK_6HZ:
++        fprintf(f_delayoff, "%u", 167);
++        fprintf(f_delayon, "%u", 167);
++        break;
++    default:
++        break;
++    }
++
++    fclose(f_delayon);
++    fclose(f_delayoff);
++
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++
++static unsigned char get_led_color(unsigned int led, unsigned char *color)
++{
++    FILE *f_green;
++    FILE *f_red;
++    FILE *f_amber;
++    char line_green[10];
++    char line_red[10];
++    char line_amber[10];
++    int red, green, amber;
++    char fname[100];
++    printf("get_led color\n");
++    if (led <= sys_devices.status_led_number) {
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++
++        f_amber = fopen(fname, "r");
++        if (!f_amber) {
++            printf("\nUnable to open LED status file");
++            return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++        }
++
++        if (0 >= fread(line_amber, 1, sizeof(line_amber),f_amber)) {
++            fclose(f_amber);
++            return IPMI_INVALID_DATA_FIELD_CC;
++        }
++
++        amber = strtoul(line_amber, NULL, 0);
++
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++        f_green = fopen(fname, "r");
++
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
++        f_red = fopen(fname, "r");
++    }
++    else {
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
++        f_green = fopen(fname, "r");
++
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
++        f_red = fopen(fname, "r");
++    }
++
++    if (!f_green || !f_red) {
++        printf("\nUnable to open LED status file");
++        if (led <= sys_devices.status_led_number)
++            fclose(f_amber);
++        if (f_red)
++            fclose(f_red);
++        if (f_green)
++            fclose(f_green);
++
++        return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++    }
++
++    if ((0 >= fread(line_green, 1, sizeof(line_green),f_green))||
++         (0 >= fread(line_red, 1, sizeof(line_red),f_red)))
++    {
++        if (led <= sys_devices.status_led_number)
++            fclose(f_amber);
++        fclose(f_green);
++        fclose(f_red);
++        return IPMI_INVALID_DATA_FIELD_CC;
++    }
++
++    red = strtoul(line_red, NULL, 0);
++    green = strtoul(line_green, NULL, 0);
++
++    if (led <= sys_devices.status_led_number) {
++        if (amber && !green && !red)
++            *color = LED_COLOR_AMBER;
++        else if (!amber && green && !red)
++            *color = LED_COLOR_GREEN;
++        else
++            *color = LED_COLOR_RED;
++
++        fclose(f_amber);
++    }
++    else {
++        if (!red && green)
++            *color = LED_COLOR_GREEN;
++        else
++            *color = LED_COLOR_RED;
++    }
++
++    fclose(f_green);
++    fclose(f_red);
++
++    return 0;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x31  LedNum
++ *
++ * LedNum:
++ * 0x0 - status LED
++ * 0x1 - FAN1 LED
++ * 0x2 - FAN2 LED
++ * 0x3 - FAN2 LED
++ * 0x4 - FAN2 LED
++ *
++**/
++static void
++handle_get_led_state(lmc_data_t    *mc,
++                     msg_t         *msg,
++                     unsigned char *rdata,
++                     unsigned int  *rdata_len,
++                     void          *cb_data)
++{
++    unsigned int led;
++    unsigned char color = LED_COLOR_RED;
++    unsigned char rv = 0;
++
++    printf("get_led state\n");
++    if (check_msg_length(msg, 1, rdata, rdata_len))
++	return;
++
++    led = msg->data[0];
++    if (led > sys_devices.status_led_number + sys_devices.fan_led_number) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    rdata[0] = 0;
++    rdata[1] = 0;
++
++    rv = get_led_color(led, &color);
++
++    if (rv) {
++        rdata[0] = rv;
++        *rdata_len = 1;
++        return;
++    }
++
++    rdata[1] = color;
++    *rdata_len = 2;
++    return;
++}
++
++/**
++ *
++ *  ipmitool mc cold reset
++ *
++ **/
++static void
++handle_bmc_cold_reset(lmc_data_t    *mc,
++			  msg_t         *msg,
++			  unsigned char *rdata,
++			  unsigned int  *rdata_len,
++			  void          *cb_data)
++{
++    int retval = 0;
++    printf("bmc cold reset\n");
++
++    /* Use three calls to "devmem" to program WDT1 to do full chip reset */
++
++    /* Change WDT1 Counter Reload Value to be equivalent to 2 seconds */
++    retval |= system("/sbin/devmem 0x1e785004 l 0x1e8480");
++
++    /* Write magic value to WDT1 Counter Restart Value to trigger
++       reload of WDT1 Counter Reload Value */
++    retval |= system("/sbin/devmem 0x1e785008 l 0x4755");
++
++    /* Enable WDT1 Control Register to do full chip reset from default
++       boot code source (CS0 Flash bank) */
++    retval |= system("/sbin/devmem 0x1e78500C l 0x37");
++
++    rdata[0] = retval;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06 0x5c [0x0]
++ *
++ **/
++static void
++handle_cpu_ready_event(lmc_data_t    *mc,
++			  msg_t         *msg,
++			  unsigned char *rdata,
++			  unsigned int  *rdata_len,
++			  void          *cb_data)
++{
++    unsigned char status_led_run_str[32];
++    unsigned int ready;
++
++    printf("cpu ready event\n");
++    if (check_msg_length(msg, 1, rdata, rdata_len)) {
++        ready = 1;
++    }
++    else {
++        ready = msg->data[0];
++        if (ready != 0 ) {
++            rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++            *rdata_len = 1;
++            return;
++        }
++    }
++#ifdef BLUEWHALE_RESET_CAUSE
++   if (ready) {
++        /* set "Presence detected" if CPU started successfully */
++        system("echo 128 > /bsp/environment/cpu_status");
++   }
++   else {
++        /* set "IERR" in case something goes wrong on CPU sturtup */
++        system("echo 1 > /bsp/environment/cpu_status");
++   }
++#endif /* BLUEWHALE_RESET_CAUSE */
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x5e [off/on] [0x1]
++ *
++ **/
++static void
++handle_cpu_hard_reset(lmc_data_t    *mc,
++			  msg_t         *msg,
++			  unsigned char *rdata,
++			  unsigned int  *rdata_len,
++			  void          *cb_data)
++{
++    printf("\n %d: %s, %s()", __LINE__, __FILE__, __FUNCTION__);
++
++    FILE *freset;
++    unsigned int reset;
++    unsigned char cpu_reboot_cmd = 0;
++
++    if (check_msg_length(msg, 1, rdata, rdata_len)) {
++        reset = 0;
++    }
++    else {
++        if (check_msg_length(msg, 2, rdata, rdata_len)) {
++            reset = msg->data[0];
++        }
++        else {
++            reset = msg->data[0];
++            cpu_reboot_cmd = msg->data[1];
++        }
++
++        if (reset > 1 || cpu_reboot_cmd > 1) {
++            rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++            *rdata_len = 1;
++            return;
++        }
++    }
++
++    freset = fopen(MLX_CPU_HARD_RESET, "w");
++
++    if (!freset) {
++            printf("\nUnable to open reset file");
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else {
++        fprintf(freset, "%u", reset);
++    }
++
++    fclose(freset);
++
++    if (!reset) {
++        if (cpu_reboot_cmd)
++            mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_OS_CRITICAL_STOP , 40, 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
++        else
++            mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_OS_CRITICAL_STOP , 0, 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
++
++    }
++
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x5f [0x1]
++ *
++ **/
++static void
++handle_cpu_soft_reset(lmc_data_t    *mc,
++                      msg_t         *msg,
++                      unsigned char *rdata,
++                      unsigned int  *rdata_len,
++                      void          *cb_data)
++{
++    FILE *freset;
++    unsigned char cpu_reboot_cmd = 0;
++    printf("cpu soft reset\n");
++    if (!check_msg_length(msg, 1, rdata, rdata_len)) {
++        cpu_reboot_cmd = msg->data[0];
++        if (cpu_reboot_cmd != 1 ) {
++            rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++            *rdata_len = 1;
++            return;
++        }
++    }
++
++    freset = fopen(MLX_CPU_SOFT_RESET, "w");
++
++    if (!freset) {
++            printf("\nUnable to open reset file");
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else {
++        fprintf(freset, "%u", 0);
++    }
++
++    fclose(freset);
++
++    if (cpu_reboot_cmd) {
++        mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_SYSTEM_BOOT_INITIATED, 40, 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x7); 
++    }
++    else
++        mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_SYSTEM_BOOT_INITIATED, 0, 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x7); 
++
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x60
++ *
++ **/
++static void
++handle_reset_phy(lmc_data_t    *mc,
++                     msg_t         *msg,
++                     unsigned char *rdata,
++                     unsigned int  *rdata_len,
++                     void          *cb_data)
++{
++    printf("\n %d: %s, %s()", __LINE__, __FILE__, __FUNCTION__);
++
++    FILE *freset;
++
++    freset = fopen(MLX_RESET_PHY, "w");
++
++    if (!freset) {
++            printf("\nUnable to open reset file");
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else {
++        fprintf(freset, "%u", 0);
++    }
++
++    fclose(freset);
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x61 (BMC - no value)
++ *  ipmitool raw 0x06  0x61 1 (CPU)
++ *
++ **/
++static void
++handle_set_uart_to_bmc(lmc_data_t    *mc,
++                     msg_t         *msg,
++                     unsigned char *rdata,
++                     unsigned int  *rdata_len,
++                     void          *cb_data)
++{
++    printf("\n %d: %s, %s()", __LINE__, __FILE__, __FUNCTION__);
++
++    FILE *fset;
++    unsigned int uart;
++
++    if (check_msg_length(msg, 1, rdata, rdata_len)) {
++        uart = 0;
++    }
++    else {
++        uart = msg->data[0];
++        if (uart != 1 ) {
++            rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++            *rdata_len = 1;
++            return;
++        }
++    }
++
++    fset = fopen(MLX_UART_TO_BMC, "w");
++
++    if (!fset) {
++            printf("\nUnable to open file");
++            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++            *rdata_len = 1;
++            return;
++    } else {
++        fprintf(fset, "%u", uart);
++    }
++
++    fclose(fset);
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x5B size_LSB size_MSB
++ *
++ **/
++static void
++handle_sel_buffer_set(lmc_data_t    *mc,
++              msg_t         *msg,
++              unsigned char *rdata,
++              unsigned int  *rdata_len,
++              void          *cb_data)
++{
++    uint16_t max_entries = 0;
++    char sel_set_cmd_buf[100];
++
++    if (check_msg_length(msg, 2, rdata, rdata_len)){
++        return;
++    }
++
++    max_entries = msg->data[0] | (((uint16_t) msg->data[1]) << 8);
++
++    if ((max_entries < IPMI_OEM_MLX_SEL_LOG_SIZE_MIN) ||
++        (max_entries > IPMI_OEM_MLX_SEL_LOG_SIZE_MAX)){
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    snprintf(sel_set_cmd_buf, sizeof(sel_set_cmd_buf), "%s %d", SEL_SET_SCRIPT_NAME, max_entries);
++    rdata[0] = system(sel_set_cmd_buf);
++
++    ipmi_mc_enable_sel(mc, max_entries, mc->sel.flags);
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x06  0x62 [zone] [enable/disable]
++ *
++ **/
++static void
++handle_thermal_algorithm_set(lmc_data_t    *mc,
++                     msg_t         *msg,
++                     unsigned char *rdata,
++                     unsigned int  *rdata_len,
++                     void          *cb_data)
++{
++    unsigned int zone, state;
++    FILE *file;
++    char fname[100];
++
++    if (check_msg_length(msg, 2, rdata, rdata_len))
++        return;
++
++    zone = msg->data[0];
++    if (zone >= MLX_MAX_THERMAL_ZONE) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    state = msg->data[1];
++    if (state > 1) {
++        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    memset(fname, 0, sizeof(fname));
++    sprintf(fname, MLX_THERMAL_ZONE, zone);
++    file = fopen(fname, "w");
++
++    if (!file) {
++        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++        *rdata_len = 1;
++     return;
++    } else {
++        if (state) 
++            fprintf(file, "enabled");
++        else
++            fprintf(file, "disabled");
++
++        fclose(file);
++    }
++
++    rdata[0] = 0;
++    *rdata_len = 1;
++}
++
++/**
++ *
++ *  ipmitool raw 0x04  0x15
++ *
++ **/
++static void handle_get_last_processed_event(lmc_data_t    *mc,
++              msg_t         *msg,
++              unsigned char *rdata,
++              unsigned int  *rdata_len,
++              void          *cb_data)
++{
++    sel_entry_t *entry;
++    sel_entry_t *p_entry = NULL;
++    int         offset;
++    int         count;
++
++    if (mc->sel.count == 0) {
++        rdata[0] = IPMI_NOT_PRESENT_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    entry = mc->sel.entries;
++    if (entry) {
++        while (entry->next) {
++            p_entry = entry;
++            entry = entry->next;
++            }
++    }
++
++    rdata[0] = 0;
++    rdata[1] = 0xff;
++    rdata[2] = 0xff;
++
++    ipmi_set_uint16(rdata+4, entry->record_id);
++    *rdata_len = 3;
++
++    offset = 0x00;
++    count = 0xff;
++
++    if ((offset+count) > 16)
++        count = 16 - offset;
++    memcpy(rdata+5, entry->data+offset, count);
++    *rdata_len = count + 5;
++}
++
++/*
++ * Chassis control for the chassis
++ */
++static int
++bmc_set_chassis_control(lmc_data_t *mc, int op, unsigned char *val,
++                        void *cb_data)
++{
++    FILE *freset;
++    int retval = 0;
++
++    switch (op) {
++    case CHASSIS_CONTROL_POWER:
++        if (*val)
++            retval = system("/usr/sbin/mlnx_poweron_bf");
++        else
++            retval = system("/usr/sbin/mlnx_poweroff_bf");
++        break;
++    case CHASSIS_CONTROL_BOOT_INFO_ACK:
++    case CHASSIS_CONTROL_BOOT:
++    case CHASSIS_CONTROL_GRACEFUL_SHUTDOWN:
++        break;
++    case CHASSIS_CONTROL_RESET:
++        retval = system("/usr/sbin/mlnx_powercycle_bf");
++        break;
++    default:
++        return EINVAL;
++    }
++
++    return retval;
++}
++
++/**
++ *
++ * ipmitool raw 0x04  0x35
++ *
++**/
++static void
++handle_get_total_power_cmd(lmc_data_t    *mc,
++                           msg_t         *msg,
++                           unsigned char *rdata,
++                           unsigned int  *rdata_len,
++                           void          *cb_data)
++{
++    unsigned char rv = 0;
++    char line_pin[10];
++    unsigned char total = 0;
++    FILE *fpin;
++
++    for (int i = 0; i < MLX_PSU_COUNT; ++i) {
++        char filename[50];
++        unsigned int tmp = 0;
++        memset(filename, 0, sizeof(filename));
++        sprintf(filename, MLX_PSU_PIN_FILE, i+1);
++
++        fpin = fopen(filename, "r");
++        if (fpin) {
++            if (0 >= fread(line_pin, 1, sizeof(line_pin),fpin))
++            {
++                fclose(fpin);
++                rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
++                *rdata_len = 1;
++                return;
++            }
++            tmp = strtoul(line_pin, NULL, 0);
++            total += tmp/1000000;
++            fclose(fpin);
++        }
++    }
++
++    rdata[0] = 0;
++    rdata[1] = total;
++    *rdata_len = 2;
++    return;
++}
++
++/**
++ *
++ * ipmitool raw 0x06  0x63
++ *
++**/
++static void
++handle_bmc_uptime_get(lmc_data_t    *mc,
++                       msg_t         *msg,
++                       unsigned char *rdata,
++                       unsigned int  *rdata_len,
++                       void          *cb_data)
++{
++    unsigned char rv = 0;
++    char uptime[10];
++    unsigned int val = 0;
++    unsigned char seconds = 0;
++    unsigned char minutes = 0;
++    unsigned char hours = 0;
++    unsigned char days = 0;
++    FILE *fuptime;
++    sys_data_t *sys = cb_data;
++
++    memset(uptime, 0, sizeof(uptime));
++    fuptime = fopen(MLX_UPTIME_FILE, "r");
++
++    if (!fuptime) {
++        sys->log(sys, OS_ERROR, NULL,"Unable to open  uptime file");
++        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
++        *rdata_len = 1;
++        return;
++    }
++
++    fscanf(fuptime, "%s", uptime);
++    val = strtoul(uptime, NULL, 0);
++
++    fclose(fuptime);
++
++    seconds = val%60;
++    days = (val - seconds)/86400; /* 60*60*24 */
++    hours = (val - seconds)/3600 - days*24;
++    minutes = (val - seconds)/60 - (hours*60 + days*24*60);
++
++    rdata[0] = 0;
++    rdata[1] = days;
++    rdata[2] = hours;
++    rdata[3] = minutes;
++    rdata[4] = seconds;
++    *rdata_len = 5;
++    return;
++}
++
++/**
++ *
++ * ipmitool raw 0x06  0x64 [sdr_type] [direction] [event_type]
++ *
++**/
++static void
++handle_log_to_sel(lmc_data_t    *mc,
++                  msg_t         *msg,
++                  unsigned char *rdata,
++                  unsigned int  *rdata_len,
++                  void          *cb_data)
++{
++    unsigned char sdr_type;
++    unsigned char direction;
++    unsigned char event_type;
++
++    if (check_msg_length(msg, 3, rdata, rdata_len)) {
++        return;
++    }
++
++    sdr_type = msg->data[0];
++    direction = msg->data[1];
++    event_type = msg->data[2];
++
++    mlx_add_event_to_sel(mc, sdr_type , 0, direction, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, event_type);
++
++    rdata[0] = 0;
++    *rdata_len = 1;
++    return;
++}
++
++static void
++reset_monitor_timeout(void *cb_data)
++{
++    sys_data_t *sys = cb_data;
++    int i;
++    struct timeval tv;
++    int fd;
++    int rv;
++#ifdef BLUEWHALE_RESET_CAUSE
++    for (i = 0; i < 8; ++i) {
++        unsigned char c = 0;
++        int active = 0;
++
++        fd = open(reset_cause[i], O_RDONLY);
++
++        rv = read(fd, &c, 1);
++        if (rv != 1) {
++            sys->log(sys, OS_ERROR, NULL, "Warning: failed to read '%s' file", reset_cause[i]);
++            continue;
++        }
++
++        active = atoi(&c);
++        if (active) {
++            switch (i) {
++            case MLX_RESET_CAUSE_AC_POWER_CYCLE:
++                //"Power Unit", "Power cycle"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_POWER_UNIT, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x1);
++                break;
++            case MLX_RESET_CAUSE_DC_POWER_CYCLE:
++                //"System Event", "OEM System boot event"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_SYSTEM_EVENT, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x1);
++                break;
++            case MLX_RESET_CAUSE_BMC_UPGRADE:
++                //"Version Change", "Firmware or software change success"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_VERSION_CHANGE, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x7);
++                break;
++            case MLX_RESET_CAUSE_CPU_KERNEL_PANIC:
++                //"System Firmware Error", "Unknown Error"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_SYSTEM_FIRMWARE_PROGRESS, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x0);
++                break;
++            case MLX_RESET_CAUSE_CPU_POWER_DOWN:
++                //"Power Unit", "Power off/down"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_POWER_UNIT, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x0);
++                break;
++            case MLX_RESET_CAUSE_CPU_REBOOT:
++                //"System Boot Initiated", "System Restart" 
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_SYSTEM_BOOT_INITIATED, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x7);
++                break;
++
++            case MLX_RESET_CAUSE_CPU_SHUTDOWN:
++                //"OS Stop/Shutdown", "OS graceful shutdown"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_OS_CRITICAL_STOP, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
++                break;
++            case MLX_RESET_CAUSE_CPU_WATCHDOG:
++                //"Watchdog 2", "Power cycle"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_WATCHDOG_2, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
++                break;
++            case MLX_RESET_CAUSE_BUTTON:
++                //"Button", "Reset Button pressed"
++                mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_BUTTON, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x2);
++                break;
++            }
++        }
++        close(fd);
++}
++#endif /* BLUEWHALE_RESET_CAUSE */
++
++    tv.tv_sec = MLX_RESET_MONITOR_TIMEOUT;
++    tv.tv_usec = 0;
++    sys->start_timer(reset_monitor_timer, &tv);
++}
++
++static void
++fans_monitor_timeout(void *cb_data)
++{
++    sys_data_t *sys = cb_data;
++    struct timeval tv;
++    int failed = 0;
++    int i = 0;
++    unsigned char fname[30];
++
++    for (i = 1; i <= sys_devices.fan_tacho_number; ++i) {
++        memset(fname, 0, sizeof(fname));
++        sprintf(fname, "/bsp/fan/fan%i_rpm", i);
++        if (access(fname, F_OK) != 0)
++            ++failed;
++    }
++
++    if (failed == sys_devices.fan_tacho_number) {
++        if (all_fans_failure == 0) {
++            mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_FAN, 0 , 0, IPMI_EVENT_READING_TYPE_DISCRETE_DEVICE_ENABLE, 0x0);
++            all_fans_failure = 1;
++        }
++    }
++    else if (all_fans_failure == 1) {
++        mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_FAN, 0 , 1, IPMI_EVENT_READING_TYPE_DISCRETE_DEVICE_ENABLE, 0x0);
++        all_fans_failure = 0;
++    }
++
++    tv.tv_sec = MLX_FANS_MONITOR_TIMEOUT;
++    tv.tv_usec = 0;
++    sys->start_timer(fans_monitor_timer, &tv);
++}
++
++/*
++ * Chassis control get for the chassis.
++ */
++static int
++bmc_get_chassis_control(lmc_data_t *mc, int op, unsigned char *val,
++			void *cb_data)
++{
++    *val = 1;
++    return 0;
++}
++
++int
++ipmi_sim_module_print_version(sys_data_t *sys, char *initstr)
++{
++    printf("IPMI Simulator Mellanox module version 0.1\n");
++    return 0;
++}
++
++/**************************************************************************
++ * Module initialization
++ *************************************************************************/
++/**
++ *
++ * This is used to initialize the module.  It is called after the
++ * configuration has been read from the LAN configuration file, but
++ * before the *.hw commands are run.
++ *
++ **/
++int
++ipmi_sim_module_init(sys_data_t *sys, const char *initstr_i)
++{
++    int rv;
++    unsigned int i;
++    struct timeval tv;
++
++    printf("IPMI Mellanox module Bluewhale %s\n", initstr_i);
++  
++    rv = ipmi_mc_alloc_unconfigured(sys, 0x20, &bmc_mc);
++    if (rv) {
++	sys->log(sys, OS_ERROR, NULL,
++		 "Unable to allocate an mc: %s", strerror(rv));
++	return rv;
++    }
++#if 0
++    rv = set_fan_enable(MLX_FAN_PWM_ENABLE_FILE);
++
++    if (rv) {
++        sys->log(sys, OS_ERROR, NULL,
++                 "Unable to enable pwm_en: %s", strerror(rv));
++    }
++
++    for (i = 0; i < MLX_FAN_MAX; ++i) {
++        rv = set_fan_enable(fan_tacho_en[i]);
++
++        if (rv) {
++            sys->log(sys, OS_ERROR, NULL,
++                     "Unable to enable tacho for FAN%i: %s", i, strerror(rv));
++        }
++    }
++#endif
++#if 0
++    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_SET_FAN_SPEED_CMD,
++                                       handle_set_fan_speed_cmd, sys);
++#endif
++    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_GET_FAN_PWM_CMD,
++                                       handle_get_fan_pwm_cmd, sys);
++
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_COLD_RESET_CMD,
++                                       handle_bmc_cold_reset, sys);
++
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_READY_EVENT_CMD,
++                                       handle_cpu_ready_event, sys);
++#if 0
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_HARD_RESET_CMD,
++                                       handle_cpu_hard_reset, sys);
++
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_SOFT_RESET_CMD,
++                                       handle_cpu_soft_reset, sys);
++#endif
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_RESET_PHY_CMD,
++                                       handle_reset_phy, sys);
++#if 0
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_SET_UART_TO_BMC_CMD,
++                                       handle_set_uart_to_bmc, sys);
++#endif
++
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_SEL_BUFFER_SET_CMD,
++                                       handle_sel_buffer_set, sys);
++    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_GET_LAST_PROCESSED_EVENT_ID_CMD,
++                                       handle_get_last_processed_event, sys);
++#if 0
++    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_GET_TOTAL_POWER_CMD,
++                                       handle_get_total_power_cmd, sys);
++#endif
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_BMC_UPTIME_GET_CMD,
++                                       handle_bmc_uptime_get, sys);
++
++    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_LOG_TO_SEL_CMD,
++                                       handle_log_to_sel, sys);
++
++    ipmi_mc_set_chassis_control_func(bmc_mc, bmc_set_chassis_control,
++                                     bmc_get_chassis_control, sys);
++
++    if (rv) {
++	sys->log(sys, OS_ERROR, NULL,
++		 "Unable to register NEW handler: %s", strerror(rv));
++    }
++
++    rv = sys->alloc_timer(sys, reset_monitor_timeout, sys, &reset_monitor_timer);
++    if (rv) {
++        int errval = errno;
++        sys->log(sys, SETUP_ERROR, NULL, "Unable to create reset monitoring timer");
++        return errval;
++    } else {
++        tv.tv_sec = MLX_RESET_MONITOR_TIMEOUT;
++        tv.tv_usec = 0;
++        sys->start_timer(reset_monitor_timer, &tv);
++    }
++#ifdef BLUEWHALE_RESET_CAUSE
++    /* set "Disabled" state at startup */
++    system("echo 256 > /bsp/environment/cpu_status");
++#endif
++
++    return 0;
++}
++
++/**
++ * This is called after the emulator command file is run. This
++ * can be used to finish up configuration of things, add
++ * functions to sensors, do any sensor initialization, or
++ * anything else that needs to be done after the emulator
++ * commands are run.
++**/
++int
++ipmi_sim_module_post_init(sys_data_t *sys)
++{
++    unsigned int fw_maj = 0;
++    unsigned int fw_min = 0;
++    unsigned char id_line[50];
++    unsigned char id_maj[2];
++    unsigned char id_min[2];
++    unsigned int  productId;
++    struct timeval tv;
++    int rv;
++    FILE *fid;
++
++    memset(id_line, 0, sizeof(id_line));
++    memset(id_min, 0, sizeof(id_min));
++    memset(id_maj, 0, sizeof(id_maj));
++
++    system("grep ID_LIKE /etc/os-release > /tmp/release");
++    fid = fopen("/tmp/release", "r");
++
++    if (!fid) {
++        sys->log(sys, OS_ERROR, NULL, "Unable to open  FW ID file");
++        return 0;
++    }
++
++    if (0 >= fread(id_line, 1, sizeof(id_line),fid))
++    {
++        fclose(fid);
++        sys->log(sys, OS_ERROR, NULL, "Unable to read  FW ID file");
++        return 0;
++    }
++
++    fclose(fid);
++
++    memcpy(id_maj, id_line+13, sizeof(id_maj));
++    memcpy(id_min, id_line+15, sizeof(id_min));
++
++    fw_maj = strtoul(id_maj, NULL, 0);
++    fw_min = strtoul(id_min, NULL, 0);
++
++    ipmi_mc_set_fw_revision(bmc_mc, fw_maj, fw_min);
++
++    productId = (sys->mc->product_id[1] << 8) | sys->mc->product_id[0];
++    switch (productId) {
++    case 1: /* Baidu BMC */
++      printf("ProductID \n");
++        sys_devices.fan_number = 4;
++        sys_devices.fan_tacho_number = 4;
++        sys_devices.fan_eeprom_number = 0;
++        sys_devices.psu_number = 0;
++        sys_devices.status_led_number = 0;
++        sys_devices.fan_led_number = 0;
++        break;
++    default:
++        break;
++    }
++
++    rv = sys->alloc_timer(sys, fans_monitor_timeout, sys, &fans_monitor_timer);
++    if (rv) {
++        int errval = errno;
++        sys->log(sys, SETUP_ERROR, NULL, "Unable to create FANs monitoring timer");
++        return errval;
++    }
++    else {
++        tv.tv_sec = MLX_FANS_MONITOR_TIMEOUT;
++        tv.tv_usec = 0;
++        printf("start fan timer \n");
++        sys->start_timer(fans_monitor_timer, &tv);
++    }
++
++    return 0;
++}
+diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
+--- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/mlxbw.hw	2018-07-10 13:17:22.684093000 -0400
+@@ -0,0 +1,205 @@
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++
++#
++# HW configuration file for the Mellanox BMC
++#
++
++# The BMC is the MC at address 20
++mc_setbmc 0x20
++
++
++#Product ID:
++# 1 - Baidu BMC
++# 2 - Bluewhale BMC
++
++# Now add the BMC
++#      IPMB DevID DevSDRs?       Rev   Maj   Min   Dev   MFG      Prod
++#                                      FW    FW    Sup   ID       Id
++#                                      Rev   Rev
++# MFG ID is the IANA.org number - 33049 for MLNX
++mc_add 0x20 1 has-device-sdrs  0x01  0x01  0x00  0x9f  0x008119 0x0002 persist_sdr
++
++#Enable SEL device
++sel_enable 0x20 1000 0x0a
++
++##################################################################################
++# Temperature Monitoring
++#          MC LUN Sens# type reading
++
++# Bluefield inlet board Temp
++sensor_add 0x20  0    1     1     1 \
++	poll 5000 \
++	file "/bsp/thermal/bf_inlet_temp" sub=-128000 div=1000
++# QSPF Inlet Board Temp
++sensor_add 0x20  0    2     1     1 \
++	poll 5000 \
++	file "/bsp/thermal/qsfp_inlet_temp" sub=-128000  div=1000
++# PCI inlet Board Temp
++sensor_add 0x20  0    3     1     1 \
++	poll 5000 \
++	file "/bsp/thermal/pci_inlet_temp" sub=-128000  div=1000
++
++##################################################################################
++# Fan Monitoring
++#          MC LUN Sens# type reading
++#Fan1 
++sensor_add 0x20 0 0x70 4 1\
++        poll 5000 \
++        file "/bsp/fan/fan1_rpm" div=100
++
++#Fan2
++sensor_add 0x20 0 0x71 4 1\
++        poll 5000 \
++        file "/bsp/fan/fan2_rpm" div=100
++
++#Fan3
++sensor_add 0x20 0 0x72 4 1\
++        poll 5000 \
++        file "/bsp/fan/fan3_rpm" div=100
++
++##################################################################################
++# Voltage Monitoring
++# VRD VIN
++sensor_add 0x20 0 160 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/vrd_vin" div=100
++
++#MB VMON 3p3 Aux
++sensor_add 0x20 0 161 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_3p3v_aux_vin" div=16
++
++#MB VMON 3p3 Standby
++sensor_add 0x20 0 162 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_3p3v_stby_vin" div=16
++
++#MB VMON 3p3 Main
++sensor_add 0x20 0 163 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_3p3v_vin" div=16
++
++#MB VMON 5v Standby
++sensor_add 0x20 0 164 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_5v_stby_vin" div=30
++
++#MB VMON 5v Aux
++sensor_add 0x20 0 165 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_5v_aux_vin" div=30
++
++#MB VMON ATX
++sensor_add 0x20 0 166 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_atx_12v_vin" div=30
++
++#MB VMON Socket0 12v - same level as ATX
++sensor_add 0x20 0 167 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_skt0_12v_vin" div=30
++
++#MB VMON Socket0 3p3v
++sensor_add 0x20 0 168 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_skt0_3p3v_vin" div=16
++
++#MB VMON Socket0 12v - same level as ATX
++sensor_add 0x20 0 169 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_skt1_12v_vin" div=30
++
++#MB VMON Socket1 3p3v
++sensor_add 0x20 0 170 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_skt1_3p3v_vin" div=16
++
++#MB VMON VCCA
++sensor_add 0x20 0 171 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_vcca_vin" div=16
++
++#MB VMON VCCINP
++sensor_add 0x20 0 172 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/mb_vmon_vccinp_vin" div=16
++
++#BF VMON VCORE
++sensor_add 0x20 0 173 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_vcore_vin" div=50
++
++#BF VMON IO 3p3v
++sensor_add 0x20 0 174 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_3p3v_io_vin" div=16
++
++#BF VMON DDR0 2p5v
++sensor_add 0x20 0 175 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_2p5v_ddr0_vin" div=16
++
++#BF VMON DDR1 2p5v
++sensor_add 0x20 0 176 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_2p5v_ddr1_vin" div=16
++
++#BF VMON VDDO 1p8v
++sensor_add 0x20 0 177 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_1p8v_vddo_vin" div=16
++
++#BF VMON DDR 1p2v
++sensor_add 0x20 0 178 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_1p2v_ddr_vin" div=16
++
++#BF VMON SERDES 1p2v
++sensor_add 0x20 0 179 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_1p2v_serdes_vin" div=16
++
++#BF VMON VCCA
++sensor_add 0x20 0 180 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_vcca_vin" div=16
++
++#BF VMON VCCINP
++sensor_add 0x20 0 181 2 1\
++        poll 5000 \
++        file "/bsp/environment/voltage/bf_vmon_vccinp_vin" div=16
++
++##################################################################################
++# Current Monitoring
++# Use sensor type 3 for current and power
++#VRD Vcore Current
++sensor_add 0x20 0 30 3 1\
++        poll 5000 \
++        file "/bsp/environment/current/vrd_vcore_iout" div=30
++
++#VRD Bluefileld DDR Current
++sensor_add 0x20 0 31 3 1\
++        poll 5000 \
++        file "/bsp/environment/current/vrd_bf_ddr_1p2v_iout" div=20
++
++###################################################################
++# EEPROMS
++mc_add_fru_data 0x20 0 1024 \
++  file 0 "/bsp/fru/eeprom_fru"
++
++mc_add_fru_data 0x20 1 1024 \
++  file 0 "/bsp/fru/eeprom_bmc"
++
++###################################################################
++# Turn on the BMC
++mc_enable 0x20
+diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
+--- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2018-07-24 16:51:49.808044000 -0400
+@@ -0,0 +1,376 @@
++#!/bin/bash
++
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++
++if [ "$1" == "add" ]; then
++  if [ "$2" == "qsfp_inlet" ]; then
++    mkdir -p /bsp/thermal/
++    ln -sf $3$4/temp2_input /bsp/thermal/$2_temp
++    ln -sf $3$4/temp2_max /bsp/thermal/$2_temp_max
++    ln -sf $3$4/temp2_max_alarm /bsp/thermal/$2_temp_max_alarm
++    ln -sf $3$4/temp2_max_hyst /bsp/thermal/$2_temp_max_hyst
++    ln -sf $3$4/temp2_fault /bsp/thermal/$2_fault
++    ln -sf $3$4/temp2_min /bsp/thermal/$2_temp_min
++    ln -sf $3$4/temp2_min_alarm /bsp/thermal/$2_temp_min_alarm
++    ln -sf $3$4/temp2_min_hyst /bsp/thermal/$2_temp_min_hyst
++    ln -sf $3$4/temp2_crit /bsp/thermal/$2_temp_crit
++    ln -sf $3$4/temp2_crit_alarm /bsp/thermal/$2_temp_crit_alarm
++    ln -sf $3$4/temp2_crit_hyst /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "bf_inlet" ]; then
++    mkdir -p /bsp/thermal/
++    ln -sf $3$4/temp3_input /bsp/thermal/$2_temp
++    ln -sf $3$4/temp3_max /bsp/thermal/$2_temp_max
++    ln -sf $3$4/temp3_max_alarm /bsp/thermal/$2_temp_max_alarm
++    ln -sf $3$4/temp3_max_hyst /bsp/thermal/$2_temp_max_hyst
++    ln -sf $3$4/temp3_fault /bsp/thermal/$2_fault
++    ln -sf $3$4/temp3_min /bsp/thermal/$2_temp_min
++    ln -sf $3$4/temp3_min_alarm /bsp/thermal/$2_temp_min_alarm
++    ln -sf $3$4/temp3_min_hyst /bsp/thermal/$2_temp_min_hyst
++    ln -sf $3$4/temp3_crit /bsp/thermal/$2_temp_crit
++    ln -sf $3$4/temp3_crit_alarm /bsp/thermal/$2_temp_crit_alarm
++    ln -sf $3$4/temp3_crit_hyst /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "pci_inlet" ]; then
++    mkdir -p /bsp/thermal/
++    ln -sf $3$4/temp4_input /bsp/thermal/$2_temp
++    ln -sf $3$4/temp4_max /bsp/thermal/$2_temp_max
++    ln -sf $3$4/temp4_max_alarm /bsp/thermal/$2_temp_max_alarm
++    ln -sf $3$4/temp4_max_hyst /bsp/thermal/$2_temp_max_hyst
++    ln -sf $3$4/temp4_fault /bsp/thermal/$2_fault
++    ln -sf $3$4/temp4_min /bsp/thermal/$2_temp_min
++    ln -sf $3$4/temp4_min_alarm /bsp/thermal/$2_temp_min_alarm
++    ln -sf $3$4/temp4_min_hyst /bsp/thermal/$2_temp_min_hyst
++    ln -sf $3$4/temp4_crit /bsp/thermal/$2_temp_crit
++    ln -sf $3$4/temp4_crit_alarm /bsp/thermal/$2_temp_crit_alarm
++    ln -sf $3$4/temp4_crit_hyst /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "mb_vmon" ]; then
++    mkdir -p /bsp/environment/
++    mkdir -p /bsp/environment/voltage/
++    ln -sf $3$4/in13_input /bsp/environment/voltage/$2_vccinp_vin
++    ln -sf $3$4/in13_highest /bsp/environment/voltage/$2_vccinp_max
++    ln -sf $3$4/in12_input /bsp/environment/voltage/$2_vcca_vin
++    ln -sf $3$4/in12_highest /bsp/environment/voltage/$2_vcca_max
++    ln -sf $3$4/in9_input /bsp/environment/voltage/$2_skt1_3p3v_vin
++    ln -sf $3$4/in9_highest /bsp/environment/voltage/$2_skt1_3p3v_max
++    ln -sf $3$4/in8_input /bsp/environment/voltage/$2_skt1_12v_vin
++    ln -sf $3$4/in8_highest /bsp/environment/voltage/$2_skt1_12v_max
++    ln -sf $3$4/in7_input /bsp/environment/voltage/$2_skt0_3p3v_vin
++    ln -sf $3$4/in7_highest /bsp/environment/voltage/$2_skt0_3p3v_max
++    ln -sf $3$4/in6_input /bsp/environment/voltage/$2_skt0_12v_vin
++    ln -sf $3$4/in6_highest /bsp/environment/voltage/$2_skt0_12v_max
++    ln -sf $3$4/in5_input /bsp/environment/voltage/$2_3p3v_stby_vin
++    ln -sf $3$4/in5_highest /bsp/environment/voltage/$2_3p3v_stby_max
++    ln -sf $3$4/in4_input /bsp/environment/voltage/$2_3p3v_vin
++    ln -sf $3$4/in4_highest /bsp/environment/voltage/$2_3p3v_max
++    ln -sf $3$4/in3_input /bsp/environment/voltage/$2_5v_aux_vin
++    ln -sf $3$4/in3_highest /bsp/environment/voltage/$2_5v_aux_max
++    ln -sf $3$4/in2_input /bsp/environment/voltage/$2_3p3v_aux_vin
++    ln -sf $3$4/in2_highest /bsp/environment/voltage/$2_3p3v_aux_max
++    ln -sf $3$4/in1_input /bsp/environment/voltage/$2_atx_12v_vin
++    ln -sf $3$4/in1_highest /bsp/environment/voltage/$2_atx_12v_max
++    ln -sf $3$4/in0_input /bsp/environment/voltage/$2_5v_stby_vin
++    ln -sf $3$4/in0_highest /bsp/environment/voltage/$2_5v_stby_max
++  fi
++  if [ "$2" == "bf_vmon" ]; then
++    mkdir -p /bsp/environment/
++    mkdir -p /bsp/environment/voltage/
++    ln -sf $3$4/in13_input /bsp/environment/voltage/$2_vccinp_vin
++    ln -sf $3$4/in13_highest /bsp/environment/voltage/$2_vccinp_max
++    ln -sf $3$4/in12_input /bsp/environment/voltage/$2_vcca_vin
++    ln -sf $3$4/in12_highest /bsp/environment/voltage/$2_vcca_max
++    ln -sf $3$4/in9_input /bsp/environment/voltage/$2_3p3v_io_vin
++    ln -sf $3$4/in9_highest /bsp/environment/voltage/$2_3p3v_io_max
++    ln -sf $3$4/in8_input /bsp/environment/voltage/$2_1p8v_vddo_vin
++    ln -sf $3$4/in8_highest /bsp/environment/voltage/$2_1p8v_vddo_max
++    ln -sf $3$4/in7_input /bsp/environment/voltage/$2_1p2v_serdes_vin
++    ln -sf $3$4/in7_highest /bsp/environment/voltage/$2_1p2v_serdes_max
++    ln -sf $3$4/in6_input /bsp/environment/voltage/$2_2p5v_ddr1_vin
++    ln -sf $3$4/in6_highest /bsp/environment/voltage/$2_2p5v_ddr1_max
++    ln -sf $3$4/in5_input /bsp/environment/voltage/$2_2p5v_ddr0_vin
++    ln -sf $3$4/in5_highest /bsp/environment/voltage/$2_2p5v_ddr0_max
++    ln -sf $3$4/in4_input /bsp/environment/voltage/$2_0p9v_ddr_vin
++    ln -sf $3$4/in4_highest /bsp/environment/voltage/$2_0p9v_ddr_max
++    ln -sf $3$4/in3_input /bsp/environment/voltage/$2_0p3v_ddr1_vin
++    ln -sf $3$4/in3_highest /bsp/environment/voltage/$2_0p3v_ddr1_max
++    ln -sf $3$4/in2_input /bsp/environment/voltage/$2_0p3v_ddr0_vin
++    ln -sf $3$4/in2_highest /bsp/environment/voltage/$2_0p3v_ddr0_max
++    ln -sf $3$4/in1_input /bsp/environment/voltage/$2_1p2v_ddr_vin
++    ln -sf $3$4/in1_highest /bsp/environment/voltage/$2_1p2v_ddr_max
++    ln -sf $3$4/in0_input /bsp/environment/voltage/$2_vcore_vin
++    ln -sf $3$4/in0_highest /bsp/environment/voltage/$2_vcore_max
++  fi
++  if [ "$2" == "vrd" ]; then
++    mkdir -p /bsp/environment
++    mkdir -p /bsp/environment/current
++    mkdir -p /bsp/environment/voltage
++    mkdir -p /bsp/environment/power
++    mkdir -p /bsp/thermal
++    ln -sf $3$4/curr1_input /bsp/environment/current/$2_vcore_iout
++    ln -sf $3$4/curr2_input /bsp/environment/current/$2_bf_ddr_1p2v_iout
++    ln -sf $3$4/in1_alarm /bsp/environment/voltage/$2_vin_alarm
++    ln -sf $3$4/in1_crit /bsp/environment/voltage/$2_vin_crit
++    ln -sf $3$4/in1_input /bsp/environment/voltage/$2_vin
++    ln -sf $3$4/in1_lcrit /bsp/environment/voltage/$2_vin_lcrit
++    ln -sf $3$4/in2_crit /bsp/environment/voltage/$2_vcore_crit
++    ln -sf $3$4/in2_crit_alarm /bsp/environment/voltage/$2_vcore_crit_alarm
++    ln -sf $3$4/in2_lcrit /bsp/environment/voltage/$2_vcore_lcrit
++    ln -sf $3$4/in2_lcrit_alarm /bsp/environment/voltage/$2_vcore_lcrit_alarm
++    ln -sf $3$4/in3_crit /bsp/environment/voltage/$2_bf_ddr_1p2v_crit
++    ln -sf $3$4/in3_crit_alarm /bsp/environment/voltage/$2_bf_ddr_1p2v_crit_alarm
++    ln -sf $3$4/in3_lcrit /bsp/environment/voltage/$2_bf_ddr_1p2v_lcrit
++    ln -sf $3$4/in3_lcrit_alarm /bsp/environment/voltage/$2_bf_ddr_1p2v_lcrit_alarm
++    ln -sf $3$4/power1_input /bsp/environment/power/$2_vcore_pout
++    ln -sf $3$4/power2_input /bsp/environment/power/$2_bf_ddr_1p2v_pout
++    ln -sf $3$4/temp1_crit /bsp/thermal/$2_vcore_temp_crit
++    ln -sf $3$4/temp1_crit_alarm /bsp/thermal/$2_vcore_temp_crit_alarm
++    ln -sf $3$4/temp1_input /bsp/thermal/$2_vcore_temp
++    ln -sf $3$4/temp1_max /bsp/thermal/$2_vcore_temp_max
++    ln -sf $3$4/temp1_max_alarm /bsp/thermal/$2_vcore_temp_max_alarm
++    ln -sf $3$4/temp2_crit /bsp/thermal/$2_bf_ddr_1p2v_temp_crit
++    ln -sf $3$4/temp2_crit_alarm /bsp/thermal/$2_bf_ddr_1p2v_temp_crit_alarm
++    ln -sf $3$4/temp2_input /bsp/thermal/$2_bf_ddr_1p2v_temp
++    ln -sf $3$4/temp2_max /bsp/thermal/$2_bf_ddr_1p2v_temp_max
++    ln -sf $3$4/temp2_max_alarm /bsp/thermal/$2_bf_ddr_1p2v_temp_max_alarm
++  fi
++
++  if [ "$2" == "fan" ]; then
++    mkdir -p /bsp/fan/
++    ln -sf $3$4/fan1_input /bsp/fan/fan1_rpm
++    ln -sf $3$4/fan2_input /bsp/fan/fan2_rpm
++    ln -sf $3$4/fan3_input /bsp/fan/fan3_rpm
++    ln -sf $3$4/pwm1 /bsp/fan/fan1_pwm
++    ln -sf $3$4/pwm2 /bsp/fan/fan2_pwm
++    ln -sf $3$4/pwm3 /bsp/fan/fan3_pwm
++    ln -sf $3$4/fan1_alarm /bsp/fan/fan1_alarm
++    ln -sf $3$4/fan2_alarm /bsp/fan/fan2_alarm
++    ln -sf $3$4/fan3_alarm /bsp/fan/fan3_alarm
++    ln -sf $3$4/fan1_max /bsp/fan/fan1_max
++    ln -sf $3$4/fan2_max /bsp/fan/fan2_max
++    ln -sf $3$4/fan3_max /bsp/fan/fan3_max
++    ln -sf $3$4/fan1_min /bsp/fan/fan1_min
++    ln -sf $3$4/fan2_min /bsp/fan/fan2_min
++    ln -sf $3$4/fan3_min /bsp/fan/fan3_min
++  fi
++  if  [ "$2" == "pci0_3p3v" ] || [ "$2" == "pci0_12v" ] || [ "$2" == "pci1_12v" ] || [ "$2" == "pci1_3p3v" ]; then
++    mkdir -p /bsp/environment
++    mkdir -p /bsp/environment/current
++    mkdir -p /bsp/environment/voltage
++    mkdir -p /bsp/environment/power
++    ln -sf $3$4/in0_input /bsp/environment/voltage/$2_vin
++    ln -sf $3$4/in1_input /bsp/environment/voltage/$2_vout
++    ln -sf $3$4/power1_input /bsp/environment/current/$2_iout
++    ln -sf $3$4/power1_input /bsp/environment/power/$2_pout
++    ln -sf $3$4/shunt_resistor /bsp/environment/power/$2_shunt_resistor
++  fi
++  if  [ "$2" == "bf_hard_reset" ] || [ "$2" == "bf_rs232_reset" ] || [ "$2" == "usb_phy_reset" ]  || [ "$2" == "jtag_cs_reset" ]; then
++    mkdir -p /bsp/reset
++    ln -sf $3$4/bf_hard_reset /bsp/reset/bf_hard_reset
++    ln -sf $3$4/bf_rs232_reset /bsp/reset/bf_rs232_reset
++    ln -sf $3$4/usb_phy_reset /bsp/reset/usb_phy_reset
++    ln -sf $3$4/jtag_cs_reset /bsp/reset/jtag_cs_reset
++  fi
++  if  [ "$2" == "clk_gen_sel" ]|| [ "$2" == "fan_ctl_sel" ] || [ "$2" == "pcie_bmc_sel" ] || [ "$2" == "pcie_skt_sel" ] || [ "$2" == "pwr_ctl_sel" ]  || [ "$2" == "fans_force_max" ]; then
++    mkdir -p /bsp/select
++    mkdir -p /bsp/fan
++    ln -sf $3$4/clk_gen_sel /bsp/select/clk_gen_sel
++    ln -sf $3$4/fan_ctl_sel /bsp/select/fan_ctl_sel
++    ln -sf $3$4/pcie_bmc_sel /bsp/select/pcie_bmc_sel
++    ln -sf $3$4/pcie_skt_sel /bsp/select/pcie_skt_sel
++    ln -sf $3$4/pwr_ctl_sel /bsp/select/pwr_ctl_sel
++    ln -sf $3$4/fan_max_speed_en /bsp/fan/fans_force_max_l
++  fi
++  if  [ "$2" == "eeprom_fru" ] || [ "$2" == "eeprom_bmc" ]; then
++      mkdir -p /bsp/fru/
++      ln -sf $3$4/eeprom /bsp/fru/$2
++  fi
++
++
++elif [ "$1" == "change" ]; then
++  if [ "$2" == "qsfp_inlet" ]; then
++    unlink /bsp/thermal/$2_temp
++    unlink  /bsp/thermal/$2_temp_max
++    unlink  /bsp/thermal/$2_temp_max_alarm
++    unlink /bsp/thermal/$2_temp_max_hyst
++    unlink /bsp/thermal/$2_fault
++    unlink /bsp/thermal/$2_temp_min
++    unlink /bsp/thermal/$2_temp_min_alarm
++    unlink /bsp/thermal/$2_temp_min_hyst
++    unlink /bsp/thermal/$2_temp_crit
++    unlink /bsp/thermal/$2_temp_crit_alarm
++    unlink /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "bf_inlet" ]; then
++    unlink /bsp/thermal/$2_temp
++    unlink /bsp/thermal/$2_temp_max
++    unlink /bsp/thermal/$2_temp_max_alarm
++    unlink /bsp/thermal/$2_temp_max_hyst
++    unlink /bsp/thermal/$2_fault
++    unlink /bsp/thermal/$2_temp_min
++    unlink /bsp/thermal/$2_temp_min_alarm
++    unlink /bsp/thermal/$2_temp_min_hyst
++    unlink /bsp/thermal/$2_temp_crit
++    unlink /bsp/thermal/$2_temp_crit_alarm
++    unlink /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "pci_inlet" ]; then
++    unlink /bsp/thermal/$2_temp
++    unlink /bsp/thermal/$2_temp_max
++    unlink /bsp/thermal/$2_temp_max_alarm
++    unlink /bsp/thermal/$2_temp_max_hyst
++    unlink /bsp/thermal/$2_fault
++    unlink /bsp/thermal/$2_temp_min
++    unlink /bsp/thermal/$2_temp_min_alarm
++    unlink /bsp/thermal/$2_temp_min_hyst
++    unlink /bsp/thermal/$2_temp_crit
++    unlink /bsp/thermal/$2_temp_crit_alarm
++    unlink /bsp/thermal/$2_temp_crit_hyst
++  fi
++  if [ "$2" == "mb_vmon" ]; then
++    unlink /bsp/environment/voltage/$2_vccinp_vin
++    unlink /bsp/environment/voltage/$2_vccinp_max
++    unlink /bsp/environment/voltage/$2_vcca_vin
++    unlink /bsp/environment/voltage/$2_vcca_max
++    unlink /bsp/environment/voltage/$2_skt1_3p3v_vin
++    unlink /bsp/environment/voltage/$2_skt1_3p3v_max
++    unlink /bsp/environment/voltage/$2_skt1_12v_vin
++    unlink /bsp/environment/voltage/$2_skt1_12v_max
++    unlink /bsp/environment/voltage/$2_skt0_3p3v_vin
++    unlink /bsp/environment/voltage/$2_skt0_3p3v_max
++    unlink /bsp/environment/voltage/$2_skt0_12v_vin
++    unlink /bsp/environment/voltage/$2_skt0_12v_max
++    unlink /bsp/environment/voltage/$2_3p3v_stby_vin
++    unlink /bsp/environment/voltage/$2_3p3v_stby_max
++    unlink /bsp/environment/voltage/$2_3p3v_vin
++    unlink /bsp/environment/voltage/$2_3p3v_max
++    unlink /bsp/environment/voltage/$2_5v_aux_vin
++    unlink /bsp/environment/voltage/$2_5v_aux_max
++    unlink /bsp/environment/voltage/$2_3p3v_aux_vin
++    unlink /bsp/environment/voltage/$2_3p3v_aux_max
++    unlink /bsp/environment/voltage/$2_atx_12v_vin
++    unlink /bsp/environment/voltage/$2_atx_12v_max
++    unlink /bsp/environment/voltage/$2_5v_stby_vin
++    unlink /bsp/environment/voltage/$2_5v_stby_max
++  fi
++  if [ "$2" == "bf_vmon" ]; then
++    unlink /bsp/environment/voltage/$2_vccinp_vin
++    unlink /bsp/environment/voltage/$2_vccinp_max
++    unlink /bsp/environment/voltage/$2_vcca_vin
++    unlink /bsp/environment/voltage/$2_vcca_max
++    unlink /bsp/environment/voltage/$2_3p3v_io_vin
++    unlink /bsp/environment/voltage/$2_3p3v_io_max
++    unlink /bsp/environment/voltage/$2_1p8v_vddo_vin
++    unlink /bsp/environment/voltage/$2_1p8v_vddo_max
++    unlink /bsp/environment/voltage/$2_1p2v_serdes_vin
++    unlink /bsp/environment/voltage/$2_1p2v_serdes_max
++    unlink /bsp/environment/voltage/$2_2p5v_ddr1_vin
++    unlink /bsp/environment/voltage/$2_2p5v_ddr1_max
++    unlink /bsp/environment/voltage/$2_2p5v_ddr0_vin
++    unlink /bsp/environment/voltage/$2_2p5v_ddr0_max
++    unlink /bsp/environment/voltage/$2_0p9v_ddr_vin
++    unlink /bsp/environment/voltage/$2_0p9v_ddr_max
++    unlink /bsp/environment/voltage/$2_0p3v_ddr1_vin
++    unlink /bsp/environment/voltage/$2_0p3v_ddr1_max
++    unlink /bsp/environment/voltage/$2_0p3v_ddr0_vin
++    unlink /bsp/environment/voltage/$2_0p3v_ddr0_max
++    unlink /bsp/environment/voltage/$2_1p2v_ddr_vin
++    unlink /bsp/environment/voltage/$2_1p2v_ddr_max
++    unlink /bsp/environment/voltage/$2_vcore_vin
++    unlink /bsp/environment/voltage/$2_vcore_max
++  fi
++  if [ "$2" == "vrd" ]; then
++    unlink /bsp/environment/current/$2_vcore_iout
++    unlink /bsp/environment/current/$2_bf_ddr_1p2v_iout
++    unlink /bsp/environment/voltage/$2_vin_alarm
++    unlink /bsp/environment/voltage/$2_vin_crit
++    unlink /bsp/environment/voltage/$2_vin
++    unlink /bsp/environment/voltage/$2_vin_lcrit
++    unlink /bsp/environment/voltage/$2_vcore_crit
++    unlink /bsp/environment/voltage/$2_vcore_crit_alarm
++    unlink /bsp/environment/voltage/$2_vcore_lcrit
++    unlink /bsp/environment/voltage/$2_vcore_lcrit_alarm
++    unlink /bsp/environment/voltage/$2_bf_ddr_1p2v_crit
++    unlink /bsp/environment/voltage/$2_bf_ddr_1p2v_crit_alarm
++    unlink /bsp/environment/voltage/$2_bf_ddr_1p2v_lcrit
++    unlink /bsp/environment/voltage/$2_bf_ddr_1p2v_lcrit_alarm
++    unlink /bsp/environment/power/$2_vcore_pout
++    unlink /bsp/environment/power/$2_bf_ddr_1p2v_pout
++    unlink /bsp/thermal/$2_vcore_temp_crit
++    unlink /bsp/thermal/$2_vcore_temp_crit_alarm
++    unlink /bsp/thermal/$2_vcore_temp
++    unlink /bsp/thermal/$2_vcore_temp_max
++    unlink /bsp/thermal/$2_vcore_temp_max_alarm
++    unlink /bsp/thermal/$2_bf_ddr_1p2v_temp_crit
++    unlink /bsp/thermal/$2_bf_ddr_1p2v_temp_crit_alarm
++    unlink /bsp/thermal/$2_bf_ddr_1p2v_temp
++    unlink /bsp/thermal/$2_bf_ddr_1p2v_temp_max
++    unlink /bsp/thermal/$2_bf_ddr_1p2v_temp_max_alarm
++  fi
++
++  if [ "$2" == "fan" ]; then
++    unlink /bsp/fan/fan1_rpm
++    unlink /bsp/fan/fan2_rpm
++    unlink /bsp/fan/fan3_rpm
++    unlink /bsp/fan/fan1_pwm
++    unlink /bsp/fan/fan2_pwm
++    unlink /bsp/fan/fan3_pwm
++    unlink /bsp/fan/fan1_alarm
++    unlink /bsp/fan/fan2_alarm
++    unlink /bsp/fan/fan3_alarm
++    unlink /bsp/fan/fan1_max
++    unlink /bsp/fan/fan2_max
++    unlink /bsp/fan/fan3_max
++    unlink /bsp/fan/fan1_min
++    unlink /bsp/fan/fan2_min
++    unlink /bsp/fan/fan3_min
++    unlink /bsp/fan/fans_force_pwm_max
++  fi
++  if  [ "$2" == "pci0_3p3v" ] || [ "$2" == "pci0_12v" ] ||[ "$2" == "pci1_12v" ] || [ "$2" == "pci1_3p3v" ]; then
++    unlink /bsp/environment/voltage/$2_vin
++    unlink /bsp/environment/voltage/$2_vout
++    unlink /bsp/environment/current/$2_iout
++    unlink /bsp/environment/power/$2_pout
++    unlink /bsp/environment/power/$2_shunt_resistor
++  fi
++  if [ "$2" == "bf_hard_reset" ]; then
++    unlink /bsp/reset/bf_hard_reset
++  fi
++  if [ "$2" == "bf_rs232_reset" ]; then
++    unlink /bsp/reset/bf_rs232_reset
++  fi
++  if [ "$2" == "usb_phy_reset" ]; then
++    unlink /bsp/reset/usb_phy_reset
++  fi
++  if [ "$2" == "jtag_cs_reset" ]; then
++    unlink /bsp/reset/jtag_cs_reset
++  fi
++  if [ "$2" == "clk_gen_sel" ]; then
++    unlink /bsp/select/clk_gen_sel
++  fi
++  if [ "$2" == "fan_ctl_sel" ]; then
++    unlink /bsp/select/fan_ctl_sel
++  fi
++  if [ "$2" == "pcie_bmc_sel" ]; then
++    unlink /bsp/select/pcie_bmc_sel
++  fi
++  if [ "$2" == "pcie_skt_sel" ]; then
++    unlink /bsp/select/pcie_skt_sel
++  fi
++  if [ "$2" == "pwr_ctl_sel" ]; then
++    unlink /bsp/select/pwr_ctl_sel
++  fi
++  if [ "$2" == "eeprom_fru" ] || [ "$2" == "eeprom_bmc" ]; then
++    unlink /bsp/fru/$2
++  fi
++fi
+diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
+--- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2018-07-03 07:35:20.816357000 -0400
+@@ -0,0 +1,77 @@
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++
++# mellanox.lan.conf
++# A configuration file for lanserv to configure the various
++# communication parameters for the device.
++
++# This is a name used to identify this instance, and used to create
++# the default name of the emulator startup command file and eventually
++# the storage facility for permanent storage.
++name "mlxbw"
++
++#
++# Work on the BMC first
++set_working_mc 0x20
++
++  # Define a LAN channel on channel 1
++  startlan 1
++    # Define an IP address and port to listen on.  You can define more
++    # than one address/port to listen on multiple addresses.  The ::
++    # listens on all addresses.
++    addr 0.0.0.0 623
++
++    # Maximum privilege limit on the channel.
++    priv_limit admin
++
++    # Allowed IPMI 1.5 authorization types
++    #allowed_auths_callback none md2 md5 straight
++    #allowed_auths_user none md2 md5 straight
++    #allowed_auths_operator none md2 md5 straight
++    #allowed_auths_admin none md2 md5 straight
++
++    # guid for IPMI 2.0 authorization  You can also use a string
++    guid "guidforauthorization"
++
++    # You can specify a BMC key for IPMI 2.0 authorization.  See the
++    # spec for details.
++    #bmc_key "abcdefghijklmnopqrst"
++
++    # A program to get and set the LAN configuration of the interface.
++    lan_config_program "/etc/ipmi/lancontrol eth1"
++  endlan
++
++  #chassis_control "./ipmi_sim_chassiscontrol 0x20"
++
++  #sol "telnet:0.0.0.0:9012" 115200
++
++  # Start startcmd at startup?  Default is false.
++  startnow false
++
++  # Now add some users.  User 0 is invalid, user 1 is the special "anonymous"
++  # user and cannot take a username.  Note that the users here are only
++  # used if the persistent user config doesn't exist.
++  #    # valid name      passw  priv-lim max-sess allowed-auths
++  user 1 true  ""        "test" user     10       none md2 md5 straight
++  user 2 true  "ADMIN" "ADMIN" admin    10       md2 md5 straight
++
++  sol "/dev/ttyS0" 115200 nortscts history=65530 historyfru=10
++
++  serial bt localhost 9012 codec BT_Mode
++
++# Dynamically load a module to extend the simulator.  After the module is
++# loaded, if the function "ipmi_sim_module_init" is defined in the module,
++# it will be called with the following parameters:
++#  int ipmi_sim_module_init(sys_data_t *sys, char *initstr);
++# where initstr is the init string passed on the module load line.
++# It should return 0 on success or an errno no failure.
++loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
+diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
+--- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/mlxbw.sdr	2018-07-25 11:02:19.315075000 -0400
+@@ -0,0 +1,1553 @@
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++# Table 43- in the IPMI v2.0 spec provides the best line for line
++# explanation of these SDR type 1 values.
++# Most of the 'non-intuitive' values are a result of IPMI requiring "raw"
++# values in the SDR record.
++# For example, if a nominal value is "30", the SDR record nominal_reading
++# value must be x in the Mx+b formula, applying the M and B out of SDR entry.
++# For sensor_maximim to be "Unspecified", it needs to evaluate to 0 after
++# the Mx+b formulat is applied.
++########################################################################
++########################################################################
++# Temperatures
++########################################################################
++########################################################################
++#Bluefield Inlet board temp sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           1
++        entity_id               system_board
++        entity_instance         1
++        sensor_type             Temperature
++        event_reading_type_code 1
++        init_scanning           true
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        return_lnc              true
++        return_lc               true
++        return_unc              true
++        return_uc               true
++        deassert_lncgl          true
++        deassert_uncgh          true
++        deassert_lcgl           true
++        deassert_ucgh           true
++        assert_lncgl            true
++        assert_uncgh            true
++        assert_lcgl             true
++        assert_ucgh             true
++        lnc_thrsh_settable      true
++        unc_thrsh_settable      true
++        lc_thrsh_settable       true
++        uc_thrsh_settable       true
++        lnc_thrsh_readable      true
++        unc_thrsh_readable      true
++        lc_thrsh_readable       true
++        uc_thrsh_readable       true
++        base_unit               degrees_C
++        analog_data_format      unsigned
++        linearization           linear
++        sensor_direction        input
++        nominal_specified       true
++        nominal_reading         159
++        sensor_maximum          128
++        sensor_minimum          0
++        m                       1
++        b                       -128
++        r_exp                   0
++        b_exp                   0
++        lc_fthresh              10
++        lnc_fthresh             15
++        unc_fthresh             45
++        uc_fthresh              50
++        positive_hysteresis     1
++        negative_hysteresis     1
++        id_string               "bf_inlet_temp"
++endsdr
++########################################################################
++#QSFP Inlet temp sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           2
++        entity_id               system_board
++        entity_instance         2
++        sensor_type             Temperature
++        event_reading_type_code 1
++        init_scanning           true
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        return_lnc              true
++        return_lc               true
++        return_unc              true
++        return_uc               true
++        deassert_lncgl          true
++        deassert_uncgh          true
++        deassert_lcgl           true
++        deassert_ucgh           true
++        assert_lncgl            true
++        assert_uncgh            true
++        assert_lcgl             true
++        assert_ucgh             true
++        lnc_thrsh_settable      true
++        unc_thrsh_settable      true
++        lc_thrsh_settable       true
++        uc_thrsh_settable       true
++        lnc_thrsh_readable      true
++        unc_thrsh_readable      true
++        lc_thrsh_readable       true
++        uc_thrsh_readable       true
++        base_unit               degrees_C
++        analog_data_format      unsigned
++        linearization           linear
++        sensor_direction        input
++        nominal_specified       true
++        nominal_reading         162
++        sensor_maximum          128
++        sensor_minimum          0
++        m                       1
++        b                       -128
++        r_exp                   0
++        b_exp                   0
++        lc_thresh              139
++        lnc_thresh             144
++        unc_thresh             175
++        uc_thresh              180
++        positive_hysteresis     1
++        negative_hysteresis     1
++        id_string               "qsfp_inlet_temp"
++endsdr
++########################################################################
++#PCI Inlet temp sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           3
++        entity_id               system_board
++        entity_instance         3
++        sensor_type             Temperature
++        event_reading_type_code 1
++        init_scanning           true
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        return_lnc              true
++        return_lc               true
++        return_unc              true
++        return_uc               true
++        deassert_lncgl          true
++        deassert_uncgh          true
++        deassert_lcgl           true
++        deassert_ucgh           true
++        assert_lncgl            true
++        assert_uncgh            true
++        assert_lcgl             true
++        assert_ucgh             true
++        lnc_thrsh_settable      true
++        unc_thrsh_settable      true
++        lc_thrsh_settable       true
++        uc_thrsh_settable       true
++        lnc_thrsh_readable      true
++        unc_thrsh_readable      true
++        lc_thrsh_readable       true
++        uc_thrsh_readable       true
++        base_unit               degrees_C
++        analog_data_format      unsigned
++        linearization           linear
++        sensor_direction        input
++        nominal_specified       true
++        nominal_reading         157
++        sensor_maximum          128
++        sensor_minimum          0
++        m                       1
++        b                       -128
++        r_exp                   0
++        b_exp                   0
++        lc_thresh              138
++        lnc_thresh             144
++        unc_thresh             173
++        uc_thresh              178
++        positive_hysteresis     1
++        negative_hysteresis     1
++        id_string               "pci_inlet_temp"
++endsdr
++
++########################################################################
++########################################################################
++# FANS
++########################################################################
++#fan1 sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           0x70
++        entity_id               fan_cooling_device
++        entity_instance         1
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_scanning           true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        event_reading_type_code 1
++        sensor_type             Fan
++        return_lc               true
++        deassert_lcgl           true
++        assert_lcgl             true
++        lc_thrsh_readable       true
++        base_unit               RPM
++        r_exp                   0
++        b_exp                   0
++        b                       0
++        m                       100
++        nominal_specified       true
++        nominal_freading        11000
++        accuracy                5
++        accuracy_exp            0
++        sensor_maximum          0
++        sensor_minimum          0
++        lc_fthresh              500
++        positive_hysteresis     2
++        negative_hysteresis     2
++        id_string               "fan1_rpm"
++endsdr
++########################################################################
++#fan2 sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           0x71
++        entity_id               fan_cooling_device
++        entity_instance         2
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_scanning           true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        event_reading_type_code 1
++        sensor_type             Fan
++        return_lc               true
++        deassert_lcgl           true
++        assert_lcgl             true
++        lc_thrsh_readable       true
++        base_unit               RPM
++        r_exp                   0
++        b_exp                   0
++        b                       0
++        m                       100
++        nominal_specified       true
++        nominal_freading        11000
++        accuracy                5
++        accuracy_exp            0
++        sensor_maximum          0
++        sensor_minimum          0
++        lc_fthresh              500
++        positive_hysteresis     2
++        negative_hysteresis     2
++        id_string               "fan2_rpm"
++endsdr
++########################################################################
++#fan3 sensor
++sdr type 1
++        sensor_owner_id         0x20
++        sensor_owner_lun        0
++        channel_number          0
++        sensor_number           0x72
++        entity_id               fan_cooling_device
++        entity_instance         3
++        init_events             true
++        init_thresholds         true
++        init_hysteresis         true
++        init_scanning           true
++        init_sensor_type        true
++        default_event_gen_on    true
++        default_sensor_scan_on  true
++        sensor_auto_rearm       true
++        sensor_event_msg_ctrl   per_state
++        sensor_threshold_access settable
++        event_reading_type_code 1
++        sensor_type             Fan
++        return_lc               true
++        deassert_lcgl           true
++        assert_lcgl             true
++        lc_thrsh_readable       true
++        base_unit               RPM
++        r_exp                   0
++        b_exp                   0
++        b                       0
++        m                       100
++        nominal_specified       true
++        nominal_freading        11000
++        accuracy                5
++        accuracy_exp            0
++        sensor_maximum          0
++        sensor_minimum          0
++        lc_fthresh              500
++        positive_hysteresis     2
++        negative_hysteresis     2
++        id_string               "fan3_rpm"
++endsdr
++########################################################################
++########################################################################
++# VOLTAGES
++########################################################################
++#VRD VIN
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            160
++        entity_id                system_board
++        entity_instance          1
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        100
++        b                        0
++        r_exp                    -3
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         12.000
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               12.800
++        lc_fthresh               11.500
++        positive_hysteresis      3
++        negative_hysteresis      3
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "vr_vin"
++endsdr
++########################################################################
++#MB VMON 3.3 Aux
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            161
++        entity_id                system_board
++        entity_instance          2
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_3p3v_aux"
++endsdr
++########################################################################
++#MB VMON 3.3 stby
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            162
++        entity_id                system_board
++        entity_instance          3
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_3p3v_stby"
++endsdr
++########################################################################
++#MB VMON 3.3 Main
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            163
++        entity_id                system_board
++        entity_instance          4
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_3p3v"
++endsdr
++########################################################################
++#MB VMON 5.0
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            164
++        entity_id                system_board
++        entity_instance          5
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         5.0
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.25
++        lc_fthresh               4.75
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_5v_stby"
++endsdr
++########################################################################
++#MB VMON 5.0 Aux
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            165
++        entity_id                system_board
++        entity_instance          6
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         5.00
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.25
++        lc_fthresh               4.75
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_5v_aux"
++endsdr
++########################################################################
++#MB VMON 5.0 Aux
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            166
++        entity_id                system_board
++        entity_instance          7
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         5.00
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.25
++        lc_fthresh               4.75
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_atx_12v"
++endsdr
++########################################################################
++#MB VMON Socket0 12V - note will be measured around 5v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            167
++        entity_id                system_board
++        entity_instance          8
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         5.00
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.25
++        lc_fthresh               4.75
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_pci0_12v"
++endsdr
++########################################################################
++#MB VMON Socket0 3.3v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            168
++        entity_id                system_board
++        entity_instance          9
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_pci0_3p3v"
++endsdr
++########################################################################
++#MB VMON Socket1 12V - note will be measured around 5v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            169
++        entity_id                system_board
++        entity_instance          10
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         5.00
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.25
++        lc_fthresh               4.75
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_pci1_12v"
++endsdr
++########################################################################
++#MB VMON Socket1 3.3v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            170
++        entity_id                system_board
++        entity_instance          11
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_pci1_3p3v"
++endsdr
++########################################################################
++#MB VMON VCCA
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            171
++        entity_id                system_board
++        entity_instance          12
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_vcca_3p3v"
++endsdr
++
++########################################################################
++#MB VMON VCCA
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            172
++        entity_id                system_board
++        entity_instance          13
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "mb_vccinp_3p3v"
++endsdr
++
++########################################################################
++#BF VMON VCORE
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            173
++        entity_id                system_board
++        entity_instance          14
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        500
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         0.9
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               0.99
++        lc_fthresh               0.81
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_vcore_0p95v"
++endsdr
++########################################################################
++#BF VMON 3p3 IO
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            174
++        entity_id                system_board
++        entity_instance          15
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_io_3p3v"
++endsdr
++########################################################################
++#BF VMON DDR0 2p5v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            175
++        entity_id                system_board
++        entity_instance          16
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         2.5
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               2.75
++        lc_fthresh               2.25
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_ddr0_2p5v"
++endsdr
++########################################################################
++#BF VMON DDR1 2p5v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            176
++        entity_id                system_board
++        entity_instance          17
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         2.5
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               2.75
++        lc_fthresh               2.25
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_ddr1_2p5v"
++endsdr
++########################################################################
++#BF VMON VDDO 1p8v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            177
++        entity_id                system_board
++        entity_instance          18
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         1.8
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               1.98
++        lc_fthresh               1.62
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_vddo_1p8v"
++endsdr
++########################################################################
++#BF VMON DDR 1p2v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            178
++        entity_id                system_board
++        entity_instance          19
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         1.2
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               1.44
++        lc_fthresh               1.02
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_ddr_1p2v"
++endsdr
++########################################################################
++#BF VMON SERDES 1p2v
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            179
++        entity_id                system_board
++        entity_instance          20
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         1.2
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               1.32
++        lc_fthresh               1.18
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_serdes_1p2v"
++endsdr
++########################################################################
++#BF VMON VCCINP
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            180
++        entity_id                system_board
++        entity_instance          21
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_vcca_3p3v"
++endsdr
++########################################################################
++#BF VMON VCCINP
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            181
++        entity_id                system_board
++        entity_instance          22
++        sensor_type              Voltage
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_lc                true
++        return_uc                true
++        deassert_lcgl            true
++        assert_lcgl              true
++        assert_ucgh              true
++        deassert_ucgh            true
++        lc_thrsh_settable        true
++        uc_thrsh_settable        true
++        lc_thrsh_readable        true
++        uc_thrsh_readable        true
++        base_unit                Volts
++        accuracy                 1
++        accuracy_exp             0
++        m                        160
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         3.3
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.465
++        lc_fthresh               3.135
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "bf_vccinp_3p3v"
++endsdr
++########################################################################
++########################################################################
++# CURRENT
++########################################################################
++#VRD VCORE Current
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            30
++        entity_id                system_board
++        entity_instance          23
++        sensor_type              Current
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_uc                true
++        assert_ucgh              true
++        deassert_ucgh            true
++        uc_thrsh_settable        true
++        uc_thrsh_readable        true
++        base_unit                Amps
++        accuracy                 1
++        accuracy_exp             0
++        m                        300
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         4.4
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               5.20
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "vr_vcore_iout"
++endsdr
++########################################################################
++#VRD BF DDR 1p2v Current
++sdr type 1
++        sensor_owner_id          0x20
++        sensor_owner_lun         0
++        channel_number           0
++        sensor_number            31
++        entity_id                system_board
++        entity_instance          24
++        sensor_type              Current
++        event_reading_type_code  1
++        sensor_event_msg_ctrl    per_state
++        sensor_threshold_access  settable
++        return_uc                true
++        assert_ucgh              true
++        deassert_ucgh            true
++        uc_thrsh_settable        true
++        uc_thrsh_readable        true
++        base_unit                Amps
++        accuracy                 1
++        accuracy_exp             0
++        m                        200
++        b                        0
++        r_exp                    -4
++        b_exp                    0
++        nominal_specified        true
++        nominal_freading         2.0
++        sensor_maximum           0
++        sensor_minimum           0
++        uc_fthresh               3.50
++        positive_hysteresis      2
++        negative_hysteresis      2
++        init_scanning            true
++        init_events              true
++        init_thresholds          true
++        init_hysteresis          true
++        init_sensor_type         true
++        sensor_auto_rearm        true
++        default_event_gen_on     true
++        default_sensor_scan_on   true
++        analog_data_format       unsigned
++        linearization            linear
++        sensor_direction         input
++        id_string                "vr_bfddr_1p2v_iout"
++endsdr
+diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
+--- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/sdr.20.main	2018-07-24 10:54:25.900700000 -0400
+@@ -0,0 +1,31 @@
++last_add_time:i:1532443877
++30:d:\1e\00Q\01= \00\1f\07\18\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
++29:d:\1d\00Q\018 \00\1e\07\17\7fH\03\01\00\02\00"\10\10\00\05\00\00,@\00\01\01\c0\01\93\00\00\00\00\00\ad\00\00\00\00\02\02\00\00\00\cdvr_vcore_iout
++28:d:\1c\00Q\019 \00\b5\07\16\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cebf_vccinp_3p3v
++27:d:\1b\00Q\017 \00\b4\07\15\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccbf_vcca_3p3v
++26:d:\1a\00Q\019 \00\b3\07\14\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00S\00\00J\00\02\02\00\00\00\cebf_serdes_1p2v
++25:d:\19\00Q\016 \00\b2\07\13\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00Z\00\00@\00\02\02\00\00\00\cbbf_ddr_1p2v
++24:d:\18\00Q\017 \00\b1\07\12\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01q\00\00\00\00\00|\00\00e\00\02\02\00\00\00\ccbf_vddo_1p8v
++23:d:\17\00Q\017 \00\b0\07\11\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr1_2p5v
++22:d:\16\00Q\017 \00\af\07\10\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr0_2p5v
++21:d:\15\00Q\015 \00\ae\07\0f\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cabf_io_3p3v
++20:d:\14\00Q\019 \00\ad\07\0e\7fH\02\01\04"\04"\12\12\00\04\00\00\f4@\00\01\01\c0\01\12\00\00\00\00\00\14\00\00\10\00\02\02\00\00\00\cebf_vcore_0p95v
++19:d:\13\00Q\019 \00\ac\07\0d\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cemb_vccinp_3p3v
++18:d:\12\00Q\017 \00\ab\07\0c\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_vcca_3p3v
++17:d:\11\00Q\017 \00\aa\07\0b\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci1_3p3v
++16:d:\10\00Q\016 \00\a9\07\0a\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci1_12v
++15:d:\0f\00Q\017 \00\a8\07\09\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci0_3p3v
++14:d:\0e\00Q\016 \00\a7\07\08\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci0_12v
++13:d:\0d\00Q\015 \00\a6\07\07\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_atx_12v
++12:d:\0c\00Q\014 \00\a5\07\06\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\c9mb_5v_aux
++11:d:\0b\00Q\015 \00\a4\07\05\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_5v_stby
++10:d:\0a\00Q\012 \00\a3\07\04\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\c7mb_3p3v
++9:d:\09\00Q\017 \00\a2\07\03\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_3p3v_stby
++8:d:\08\00Q\016 \00\a1\07\02\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cbmb_3p3v_aux
++7:d:\07\00Q\011 \00\a0\07\01\7fH\02\01\04"\04"\12\12\00\04\00\00d\00\00\01\01\d0\01x\00\00\00\00\00z\00\00v\00\02\02\00\00\00\c6vr_vin
++6:d:\06\00Q\013 \00r\1d\03\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan3_rpm
++5:d:\05\00Q\013 \00q\1d\02\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan2_rpm
++4:d:\04\00Q\013 \00p\1d\01\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan1_rpm
++3:d:\03\00Q\019 \00\03\07\03\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9d\00\00\80\00\00\b2\ad\00\8a\90\01\01\00\00\00\cepci_inlet_temp
++2:d:\02\00Q\01: \00\02\07\02\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\a2\00\00\80\00\00\b4\af\00\8b\90\01\01\00\00\00\cfqsfp_inlet_temp
++1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
+diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
+--- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2018-06-27 15:04:02.669400000 -0400
+@@ -0,0 +1,21 @@
++#!/bin/bash
++
++########################################################################
++# Copyright (c) 2018 Mellanox Technologies.
++# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++#
++# Licensed under the GNU General Public License Version 2
++#
++# This program is free software; you can redistribute it and/or modify
++# it under the terms of the GNU General Public License as published by
++# the Free Software Foundation; either version 2 of the License, or
++# (at your option) any later version.
++#
++
++H_SIZE=$1
++
++if [ $H_SIZE -gt 4095 ] || [ $H_SIZE -lt 64 ]; then
++        echo "Invalid range. Value must be in range 64-4095\n"
++else
++        sed -i'' "s/^sel_enable \([0-9x]*\) [^ ]* \([0-9x]*\)/sel_enable \1 $H_SIZE \2/g" /etc/ipmi/mlxbw.hw
++fi

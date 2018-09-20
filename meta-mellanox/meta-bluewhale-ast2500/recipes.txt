@@ -1,0 +1,5 @@
+recipes-bsp          - Anything with links to specific hardware or hardware configuration information
+recipes-connectivity - Libraries and applications related to communication with other devices 
+recipes-devtools     - Tools primarily used by the build system (but can also be used on targets)
+recipes-kernel       - The kernel and generic applications/libraries with strong kernel dependencies
+recipes-phosphor     - Phosphor OpenBMC applications and configuration

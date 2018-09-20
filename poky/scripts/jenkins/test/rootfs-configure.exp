@@ -1,0 +1,91 @@
+#!/usr/bin/expect
+#
+# This script is used to get to the NFS server, cleanup the
+# last target Root File System directory and finally install
+# the recent FS to be tested, if needed. Those tasks requires
+# root permissions because during the target bootup, the Root
+# FS is mounted and several files are created. Those files are
+# created by the NFS user and cannot be deleted otherwise.
+#
+#
+#  Requires following arguments be set:
+#   ipaddress : IP address or hostname of the remote target.
+#   password  : Password of root on the remote target.
+#   rootpath  : Path to the rootfs directory.
+
+set timeout 10
+
+if {[llength $argv] != 3} {
+    # We give a message so the user know our syntax:
+    puts "usage: rootfs-configure.exp ipaddress password rootpath"
+    exit 1
+}
+
+set ipaddress [lindex $argv 0];
+set password [lindex $argv 1];
+set rootpath [lindex $argv 2];
+
+set rootfs "rootfs"
+set rootfs_gz "rootfs.cpio.gz"
+
+# Spawn the ssh process and submit the user and the address.
+spawn ssh root@$ipaddress
+
+expect {
+    timeout { send_user "\nFailed, no login prompt\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "assword:"
+}
+
+# Send the password to login
+send "$password\r"
+
+expect {
+    timeout { send_user "\nFailed, could not login\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+# Get into the rootpath directory
+send "cd $rootpath\r"
+
+expect {
+    timeout { send_user "\nFailed, to cd $rootpath\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+# Cleanup last rootfs
+send "ls $rootpath | grep $rootfs\r"
+expect {
+    "\r\n$rootfs" { send "rm -fr $rootfs\r" }
+    "cannot access" { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+# Create the Root FS directory
+send "mkdir $rootfs && cd $rootfs\r"
+expect {
+    timeout { send_user "\nFailed, to create $rootfs directory\n"; exit 1 }
+    eof { send_user "\nFailure, got EOF"; exit 1 }
+    "#"
+}
+
+# Decompress the Root File System
+send "zcat $rootpath/$rootfs_gz | cpio -idm\r"
+expect {
+  timeout { send_user "\nFailed, to decompress $rootfs_gz\n"; exit 1 }
+  eof { send_user "\nFailure, got EOF"; exit 1 }
+  "#"
+}
+
+# Change Root FS directory permissions
+send "chmod -R 777 $rootpath/$rootfs\r"
+expect {
+  timeout { send_user "\nFailed, to change permissions\n"; exit 1 }
+  eof { send_user "\nFailure, got EOF"; exit 1 }
+  "#"
+}
+
+send "exit\r"
+expect eof

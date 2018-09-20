@@ -1,0 +1,10 @@
+[Unit]
+Description=Mellanox Fan Controller
+
+[Service]
+Restart=always
+RestartSec=60
+ExecStart={sbindir}/obmc-mellanox-fand.sh
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}
