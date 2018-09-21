@@ -21,11 +21,11 @@ OBMC_RIMAGE=${OBMC_RIMAGE:-${OBMC_RBUILD}/images}
 # bitbake command
 case ${OBMC_BOARD} in
   bluewhale)
-    TEMPLATECONF=meta-openbmc-machines/meta-arm/meta-mellanox/meta-bluewhale-ast2500/conf
+    TEMPLATECONF=meta-mellanox/meta-bluewhale-ast2500/conf
     BITBAKE_IMG="obmc-phosphor-image"
     ;;
   evb)
-    TEMPLATECONF=meta-openbmc-machines/meta-evb/meta-evb-aspeed/meta-evb-ast2500/conf
+    TEMPLATECONF=meta-evb/meta-evb-aspeed/meta-evb-ast2500/conf
     BITBAKE_IMG="obmc-phosphor-image"
     ;;
   *)

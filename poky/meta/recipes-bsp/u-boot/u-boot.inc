@@ -305,6 +305,10 @@ do_deploy () {
         ln -sf ${UBOOT_EXTLINUX_SYMLINK} ${DEPLOYDIR}/${UBOOT_EXTLINUX_CONF_NAME}-${MACHINE}
         ln -sf ${UBOOT_EXTLINUX_SYMLINK} ${DEPLOYDIR}/${UBOOT_EXTLINUX_CONF_NAME}
     fi
+
+    if [ -e ${WORKDIR}/build/u-boot-env.bin ] ; then
+        install -m 644 ${WORKDIR}/build/u-boot-env.bin ${DEPLOYDIR}
+    fi
 }
 
 addtask deploy before do_build after do_compile
