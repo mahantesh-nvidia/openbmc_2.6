@@ -10,7 +10,7 @@ PE = "1"
 SRCREV = "${AUTOREV}"
 
 UBRANCH = "mlnx-1.0"
-SRC_URI = "git://bu-gerrit.mtbu.labs.mlnx/bmc-u-boot.git;branch=${UBRANCH}"
+SRC_URI = "git://bu-gerrit.mtbu.labs.mlnx/bmc-u-boot;branch=${UBRANCH}"
 
 S = "${WORKDIR}/git"
 

@@ -27,6 +27,8 @@ EXTRA_OECONF = "\
     --with-mlxbw \
     "
 
+RDEPENDS_${PN} = "bash"
+
 S = "${WORKDIR}/git"
 
 PARALLEL_MAKEINST = ""

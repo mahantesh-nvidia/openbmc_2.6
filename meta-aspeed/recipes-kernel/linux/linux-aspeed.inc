@@ -6,7 +6,7 @@ PROVIDES += "virtual/kernel"
 
 KCONFIG_MODE="--alldefconfig"
 
-KSRC ?= "git://bu-gerrit.mtbu.labs.mlnx/bmc-linux.git;protocol=git;branch=${KBRANCH}"
+KSRC ?= "git://bu-gerrit.mtbu.labs.mlnx/bmc-linux;protocol=git;branch=${KBRANCH}"
 SRC_URI = "${KSRC}"
 SRC_URI += " file://defconfig"
 

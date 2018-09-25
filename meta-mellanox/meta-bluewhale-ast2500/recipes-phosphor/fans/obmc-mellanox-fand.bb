@@ -16,6 +16,8 @@ SYSTEMD_SERVICE_${PN} += "obmc-mellanox-fand.service"
 
 RRECOMMENDS_${PN} += "obmc-targets"
 
+do_compile[noexec] = "1"
+
 do_install() {
         install -d ${D}/${sbindir}
         install -m 755 ${S}/obmc-mellanox-fand.sh ${D}/${sbindir}/obmc-mellanox-fand.sh
