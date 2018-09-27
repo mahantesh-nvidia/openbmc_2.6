@@ -11,8 +11,8 @@
 #    <bmc-image-file> is a 32MB file representing all partitions in BMC SPI Flash
 #    <bmc-image-file> exists on local filesystem
 #    "bmc" MTD partition represents entire BMC SPI Flash device
-#    /dev/mtd6 is a SQUASHFS filesystem (rofs) partition
-#    /dev/mtd7 is a JFFS2 filesystem (rwfs) partition
+#    /dev/mtd4 is a SQUASHFS filesystem (rofs) partition
+#    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
 version="03/15/2018"
@@ -60,11 +60,11 @@ systemctl stop obmc-phosphor-sysd
 systemctl stop org.openbmc.*
 systemctl stop systemd-networkd
 
-echo $0: Remounting rwfs "(/dev/mtd7)" as read-only
-mount /dev/mtdblock7 /run/initramfs/rw -t jffs2 -o remount,ro
+echo $0: Remounting rwfs "(/dev/mtd5)" as read-only
+mount /dev/mtdblock5 /run/initramfs/rw -t jffs2 -o remount,ro
 
-echo $0: Unmounting rofs "(/dev/mtd6)"
-umount /dev/mtdblock6
+echo $0: Unmounting rofs "(/dev/mtd4)"
+umount /dev/mtdblock4
 
 # Check if we're running out of backup flash based on WDT2 Timeout Status
 # Register; if bit1 (0x2) is set it indicates 'second boot code' i.e. CS1

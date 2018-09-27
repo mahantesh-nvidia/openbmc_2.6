@@ -18,13 +18,11 @@ INSANE_SKIP_${PN}_append = "already-stripped"
 #
 
 do_install() {
-	rm -f ${RPMSDIR}/tmp.xz
 	rm -f ${RPMSDIR}/tmp.cpio
 	rm -rf ${S}/usr/
 	rm -rf ${S}/etc/
 
-	rpm2cpio ${RPMSDIR}/mft-4.9.0-27.arm6l.rpm > ${RPMSDIR}/tmp.xz
-	xz -d -c ${RPMSDIR}/tmp.xz > ${RPMSDIR}/tmp.cpio
+	rpm2cpio.sh ${RPMSDIR}/mft-4.9.0-27.arm6l.rpm > ${RPMSDIR}/tmp.cpio
 	cpio -i -d < ${RPMSDIR}/tmp.cpio
 
 	install -d ${D}/usr/bin/

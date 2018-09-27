@@ -9,7 +9,8 @@
 #    <bmc-image-file> is a 32MB file representing all partitions in BMC SPI Flash
 #    <bmc-image-file> exists on local filesystem
 #    /dev/mtd0 represents entire BMC SPI Flash device
-#    /dev/mtd7 is a JFFS2 filesystem (rwfs) partition
+#    /dev/mtd4 is a SQUASHFS filesystem (rofs) partition
+#    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
 if [ -f $1 ]
@@ -20,11 +21,11 @@ else
    exit
 fi
 
-echo $0: Remounting rwfs "(/dev/mtd7)" as read-only
-mount /dev/mtdblock7 /run/initramfs/rw -t jffs2 -o remount,ro
+echo $0: Remounting rwfs "(/dev/mtd5)" as read-only
+mount /dev/mtdblock5 /run/initramfs/rw -t jffs2 -o remount,ro
 
-echo $0: Unmounting rofs "(/dev/mtd6)"
-umount /dev/mtdblock6
+echo $0: Unmounting rofs "(/dev/mtd4)"
+umount /dev/mtdblock4
 
 # Write bit1 of WDT2 Clear Timeout Status Register to clear status
 /sbin/devmem 0x1e785034 l 0x01;

@@ -7,7 +7,7 @@ Please scp image file to /tmp folder and re-burn main flash with:
 
 mkdir /run/lock;
 
-mount /dev/mtdblock7 /run/initramfs/rw -t jffs2 -o remount,ro;
+mount /dev/mtdblock5 /run/initramfs/rw -t jffs2 -o remount,ro;
 mount tmpfs tmp -t tmpfs -o mode=755,nodev;
 
 IP=`/sbin/fw_printenv ipaddr | sed -n "s/^ipaddr=//p"`;
