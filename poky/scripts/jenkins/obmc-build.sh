@@ -130,10 +130,11 @@ TARGET_IMGSL=${OBMC_RBUILD}/${TARGET}-images
 ln -sf tmp/deploy/images/${TARGET} ${TARGET_IMGSL}
 
 # Fetch BMC SPI flash images. Those images are packed into tarballs.
-BMC_FULL_IMAGE_TAR=$(ls ${TARGET_IMGSL}/*.all.tar)
-BMC_SEPA_IMAGE_TAR=$(ls ${TARGET_IMGSL}/*.tar | grep -v 'all')
-BMC_FULL_IMAGE_CNT=$(ls ${TARGET_IMGSL}/*.all.tar | wc -l)
-BMC_SEPA_IMAGE_CNT=$(ls ${TARGET_IMGSL}/*.tar | grep -v 'all' | wc -l)
+# File naming convention: {OBMC_BOARD}-{TIMESTAMP}.all.tar & .tar
+BMC_FULL_IMAGE_TAR=$(ls ${TARGET_IMGSL}/${OBMC_BOARD}*.all.tar)
+BMC_SEPA_IMAGE_TAR=$(ls ${TARGET_IMGSL}/${OBMC_BOARD}*.tar | grep -v 'all')
+BMC_FULL_IMAGE_CNT=$(ls ${TARGET_IMGSL}/${OBMC_BOARD}*.all.tar | wc -l)
+BMC_SEPA_IMAGE_CNT=$(ls ${TARGET_IMGSL}/${OBMC_BOARD}*.tar | grep -v 'all' | wc -l)
 
 # Technically, the bitbake build should have generated a single tarball
 # that contains the full bmc image and a single tarball that contains
@@ -145,8 +146,8 @@ if [ ${BMC_FULL_IMAGE_CNT} -ne 1 ] || [ ${BMC_SEPA_IMAGE_CNT} -ne 1 ]; then
 fi
 
 # Fetch the Root File System
-BMC_ROOTFS_TAR=$(ls ${TARGET_IMGSL}/*rootfs.cpio.gz)
-BMC_ROOTFS_CNT=$(ls ${TARGET_IMGSL}/*rootfs.cpio.gz | wc -l)
+BMC_ROOTFS_TAR=$(ls ${TARGET_IMGSL}/*rootfs.squashfs-xz)
+BMC_ROOTFS_CNT=$(ls ${TARGET_IMGSL}/*rootfs.squashfs-xz | wc -l)
 
 if [ ${BMC_ROOTFS_CNT} -ne 1 ]; then
     echo "Cannot copy the Root File System."
@@ -163,7 +164,8 @@ tar -xf ${BMC_SEPA_IMAGE_TAR} -C ${OBMC_RIMAGE}
 cp ${BMC_ROOTFS_TAR} ${OBMC_RIMAGE}
 
 # Copy BMC full image with timestamp in name
-BMC_FULL_TIMESTAMP_IMAGE=$(ls ${TARGET_IMGSL}/flash-${TARGET}-*)
+# File naming convention: obmc-phosphor-image-{OBMC_BOARD}-{TIMESTAMP}.static.mtd
+BMC_FULL_TIMESTAMP_IMAGE=$(ls ${TARGET_IMGSL}/obmc-phosphor-image-${TARGET}-*.static.mtd)
 cp ${BMC_FULL_TIMESTAMP_IMAGE} ${OBMC_RIMAGE}
 
 # Create softlink for image-bmc
@@ -173,7 +175,7 @@ ln -sf $(basename ${BMC_FULL_TIMESTAMP_IMAGE}) ${OBMC_RIMAGE}/image-bmc
 md5sum ${BMC_FULL_TIMESTAMP_IMAGE} > ${OBMC_RIMAGE}/$(basename ${BMC_FULL_TIMESTAMP_IMAGE}).md5sum
 
 # Generate the BMC datetime based off field in full image filename
-BMC_DATETIME=`echo $(basename ${BMC_FULL_TIMESTAMP_IMAGE}) | cut -d "-" -f 4`
+BMC_DATETIME=`echo $(basename ${BMC_FULL_TIMESTAMP_IMAGE}) | cut -d "-" -f 6 | cut -d "." -f 1`
 
 # Copy BMC U-Boot image with version in name, giving it new name with timestamp
 BMC_UBOOT_VERSION_IMAGE=$(ls ${TARGET_IMGSL}/u-boot-${TARGET}-*)

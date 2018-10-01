@@ -28,7 +28,7 @@ LINUX_KSRC=${LINUX_KSRC:-.}
 LINUX_KBUILD=${LINUX_KBUILD:-$(pwd)/build}
 LINUX_KIMAGE=${LINUX_KIMAGE:-${LINUX_KBUILD}}
 LINUX_DEFCONFIG=${LINUX_DEFCONFIG:-mlx_bmc_defconfig}
-LINUX_DT_FILENAME=${LINUX_DT_FILENAME:-mlx-bluewhale-ast2500}
+LINUX_DT_FILENAME=${LINUX_DT_FILENAME:-aspeed-bmc-mlx-bluewhale}
 
 # Set constant variables
 KSRC=$(basename $(realpath ${LINUX_KSRC}))
@@ -46,7 +46,7 @@ mkdir -p ${KBUILD_DIR}
 echo "BMC Linux kernel build started, $(date)" > ${LOG}
 
 # Configure PATH
-PATH=${PATH}:/auto/sw_soc_dev/tools/gcc/bmc-gcc-5.3.0/bin/arm-openbmc-linux-gnueabi
+PATH=${PATH}:/auto/sw_soc_dev/tools/gcc/bmc-gcc-7.3.0/bin/arm-openbmc-linux-gnueabi
 
 # Go into the linux directory and the script will put us
 # in a build subdirectory.

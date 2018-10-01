@@ -246,6 +246,7 @@ do_mk_static_symlinks() {
 	ln -sf ${IMAGE_NAME}.static.mtd ${IMGDEPLOYDIR}/flash-${MACHINE}
 	ln -sf ${IMAGE_NAME}.static.mtd ${IMGDEPLOYDIR}/image-bmc
 	ln -sf u-boot.${UBOOT_SUFFIX} ${IMGDEPLOYDIR}/image-u-boot
+	ln -sf u-boot-env.${UBOOT_SUFFIX} ${IMGDEPLOYDIR}/image-u-boot-env
 	ln -sf ${FLASH_KERNEL_IMAGE} ${IMGDEPLOYDIR}/image-kernel
 	ln -sf ${IMAGE_LINK_NAME}.${IMAGE_BASETYPE} ${IMGDEPLOYDIR}/image-rofs
 	ln -sf rwfs.${OVERLAY_BASETYPE} ${IMGDEPLOYDIR}/image-rwfs
@@ -302,6 +303,7 @@ make_image_links() {
 	# Create some links to help make the tar archive in the format
 	# expected by phosphor-bmc-code-mgmt.
 	ln -sf ${DEPLOY_DIR_IMAGE}/u-boot.${UBOOT_SUFFIX} image-u-boot
+	ln -sf ${DEPLOY_DIR_IMAGE}/u-boot-env.${UBOOT_SUFFIX} image-u-boot-env
 	ln -sf ${DEPLOY_DIR_IMAGE}/${FLASH_KERNEL_IMAGE} image-kernel
 	ln -sf ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.$rofs image-rofs
 	ln -sf rwfs.$rwfs image-rwfs
@@ -314,7 +316,7 @@ make_tar_of_images() {
 
 	# Create the tar archive
 	tar -h -cvf ${IMGDEPLOYDIR}/${IMAGE_NAME}.$type.mtd.tar \
-		image-u-boot image-kernel image-rofs image-rwfs $extra_files
+		image-u-boot image-u-boot-env image-kernel image-rofs image-rwfs $extra_files
 
 	cd ${IMGDEPLOYDIR}
 	ln -sf ${IMAGE_NAME}.$type.mtd.tar ${IMGDEPLOYDIR}/${IMAGE_LINK_NAME}.$type.mtd.tar
@@ -324,7 +326,7 @@ do_generate_static_tar() {
 	ln -sf ${S}/MANIFEST MANIFEST
 	ln -sf ${S}/publickey publickey
 	make_image_links ${OVERLAY_BASETYPE} ${IMAGE_BASETYPE}
-	make_signatures image-u-boot image-kernel image-rofs image-rwfs MANIFEST publickey
+	make_signatures image-u-boot image-u-boot-env image-kernel image-rofs image-rwfs MANIFEST publickey
 	make_tar_of_images static MANIFEST publickey ${signature_files}
 
 	# Maintain non-standard legacy link.
@@ -346,7 +348,7 @@ do_generate_ubi_tar() {
 	ln -sf ${S}/MANIFEST MANIFEST
 	ln -sf ${S}/publickey publickey
 	make_image_links ${FLASH_UBI_OVERLAY_BASETYPE} ${FLASH_UBI_BASETYPE}
-	make_signatures image-u-boot image-kernel image-rofs image-rwfs MANIFEST publickey
+	make_signatures image-u-boot image-u-boot-env image-kernel image-rofs image-rwfs MANIFEST publickey
 	make_tar_of_images ubi MANIFEST publickey ${signature_files}
 }
 do_generate_ubi_tar[dirs] = " ${S}/ubi"

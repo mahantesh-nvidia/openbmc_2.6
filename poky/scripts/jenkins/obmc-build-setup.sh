@@ -82,7 +82,7 @@ if [ "${BUILD_TYPE}" = "verify" ]; then
             env LINUX_KSRC=${SRC}/bmc-linux \
                 LINUX_KBUILD=${BUILD} \
                 LINUX_KIMAGE=${IMAGE} \
-            ${SCRIPTS}/kernel-build.sh mlx_bmc_defconfig mlx-bluewhale-ast2500
+            ${SCRIPTS}/kernel-build.sh mlx_bmc_defconfig aspeed-bmc-mlx-bluewhale
             exit $?
             ;;
         bmc-openbmc)
@@ -104,7 +104,7 @@ fi
 # then apply a simple patch to fix it. The patch simply disables
 # the checker.
 sed -i '/status.addresult(check_not_nfs(tmpdir, "TMPDIR"))/d' \
-    ${OBMC_SRC}/import-layers/yocto-poky/meta/classes/sanity.bbclass
+    ${OBMC_SRC}/poky/meta/classes/sanity.bbclass
 
 # Kick off the remote build; this should run for both nightly and OpenBMC
 # verification.
