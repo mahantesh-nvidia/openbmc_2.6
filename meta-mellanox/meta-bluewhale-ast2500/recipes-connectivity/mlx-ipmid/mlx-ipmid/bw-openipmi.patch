@@ -2433,7 +2433,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    memset(id_min, 0, sizeof(id_min));
 +    memset(id_maj, 0, sizeof(id_maj));
 +
-+    system("grep ID_LIKE /etc/os-release > /tmp/release");
++    system("grep BUILD_ID /etc/os-release > /tmp/release");
 +    fid = fopen("/tmp/release", "r");
 +
 +    if (!fid) {
@@ -2450,8 +2450,8 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +
 +    fclose(fid);
 +
-+    memcpy(id_maj, id_line+13, sizeof(id_maj));
-+    memcpy(id_min, id_line+15, sizeof(id_min));
++    memcpy(id_maj, id_line+11, 1);
++    memcpy(id_min, id_line+13, 1);
 +
 +    fw_maj = strtoul(id_maj, NULL, 0);
 +    fw_min = strtoul(id_min, NULL, 0);

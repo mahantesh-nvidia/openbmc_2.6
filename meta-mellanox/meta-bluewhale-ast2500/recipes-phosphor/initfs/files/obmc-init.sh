@@ -418,6 +418,18 @@ FLASH_CP=`/root/sbin/devmem 0x1e785030`
 FLASH_CP=$(($FLASH_CP&0x02))
 rm /dev/mem
 
+# The /etc/issue file displays DISTRO_NAME and DISTRO_VERSION
+# information upon platform boot and after console logout.
+# The DISTRO_VERSION is initialized to a hardcoded value of
+# "0.1.0" (?) in the common recipe "phosphor-base.inc".  A more
+# informative version would be something like VERSION, which
+# is embedded in the PRETTY_NAME string from /etc/os-release.
+# Rather than change a common recipe, change our Mellanox init
+# logic to create our own /etc/issue file using PRETTY_NAME
+name=`grep PRETTY_NAME /root/etc/os-release | cut -c 13- | sed -e 's/"//g'`
+printf "%s " $name > /root/etc/issue
+printf "\\\n \\\l\n" >> /root/etc/issue
+
 if [ $FLASH_CP == 0 ]; then
     echo "Booted from primary flash";
     exec chroot /root $init;
