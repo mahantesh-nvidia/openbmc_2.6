@@ -11,6 +11,7 @@ set -exo pipefail
 
 # Setup default variables
 BUILD_TYPE={$BUILD_TYPE:-verify}
+BMC_RELEASE=mlnx-1.0
 
 # Build process type is passed as an optional argument
 if [ $# -ge 1 ]; then
@@ -131,7 +132,7 @@ fi
 # tree, since it's larger than 20GB and there is no particular
 # benefit.
 if [ "${BUILD_TYPE}" = "nightly" ]; then
-    GLOBAL_PROJECT=/auto/sw_soc_dev/bmc
+    GLOBAL_PROJECT=/auto/sw_soc_dev/bmc/${BMC_RELEASE}
 
     # Every nightly build will be in a directory named after the
     # build date, and a symbolic link is created to point to the
