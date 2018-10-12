@@ -71,7 +71,8 @@ if [ "${BUILD_TYPE}" = "verify" ]; then
     # Work out what build we should be running
     case ${GERRIT_PROJECT} in
         bmc-u-boot)
-             # Kick off the u-boot build
+             # Kick off the u-boot verify build on remote host
+            ssh -n ${BITBAKE_HOST} \
             env UBOOT_SRC=${SRC}/bmc-u-boot \
                 UBOOT_BUILD=${BUILD} \
                 UBOOT_IMAGE=${IMAGE} \
@@ -79,7 +80,8 @@ if [ "${BUILD_TYPE}" = "verify" ]; then
             exit $?
             ;;
         bmc-linux)
-            # Kick off the Linux build
+            # Kick off the Linux verify build on remote host
+            ssh -n ${BITBAKE_HOST} \
             env LINUX_KSRC=${SRC}/bmc-linux \
                 LINUX_KBUILD=${BUILD} \
                 LINUX_KIMAGE=${IMAGE} \
