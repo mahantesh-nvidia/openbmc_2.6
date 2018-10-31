@@ -7,10 +7,11 @@ PE = "1"
 
 # We use the revision in order to avoid having to fetch it from the
 # repo during parse
-SRCREV = "${AUTOREV}"
+SRCREV = "fc8646ea8a4f24ff8267fa2eee0ee33327f1f36c"
 
-UBRANCH = "mlnx-1.0"
-SRC_URI = "git://bu-gerrit.mtbu.labs.mlnx/bmc-u-boot;branch=${UBRANCH}"
+UBRANCH = "v2016.07-aspeed-openbmc"
+UBOOT_SRC ?= "git://git@github.com/openbmc/u-boot.git;branch=${UBRANCH};protocol=https"
+SRC_URI = "${UBOOT_SRC}"
 
 S = "${WORKDIR}/git"
 
