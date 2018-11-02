@@ -1,6 +1,6 @@
 diff -ruN a/configure.ac b/configure.ac
---- a/configure.ac	2018-06-27 14:55:45.602011000 -0400
-+++ b/configure.ac	2018-06-27 15:05:54.284230000 -0400
+--- a/configure.ac	2018-10-31 14:35:53.068438000 -0400
++++ b/configure.ac	2018-10-31 14:40:16.475092000 -0400
 @@ -286,6 +286,17 @@
  )
  AC_SUBST([MELLANOX_DIR])
@@ -28,8 +28,8 @@ diff -ruN a/configure.ac b/configure.ac
  	  doc/Makefile
  	  man/Makefile
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
---- a/lanserv/bmc_app.c	2018-06-27 14:56:09.561539000 -0400
-+++ b/lanserv/bmc_app.c	2018-06-27 15:04:37.153719000 -0400
+--- a/lanserv/bmc_app.c	2018-10-31 14:35:53.075437000 -0400
++++ b/lanserv/bmc_app.c	2018-10-31 14:32:51.981117000 -0400
 @@ -46,7 +46,7 @@
  
  #ifdef MLX_IPMID
@@ -171,8 +171,8 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
  
  static void
 diff -ruN a/lanserv/bmc_sensor.c b/lanserv/bmc_sensor.c
---- a/lanserv/bmc_sensor.c	2018-06-27 14:56:16.434393000 -0400
-+++ b/lanserv/bmc_sensor.c	2018-06-27 15:04:43.472618000 -0400
+--- a/lanserv/bmc_sensor.c	2018-10-31 14:35:53.079443000 -0400
++++ b/lanserv/bmc_sensor.c	2018-10-31 14:33:02.505901000 -0400
 @@ -49,7 +49,7 @@
  
  #ifdef MLX_IPMID
@@ -282,8 +282,8 @@ diff -ruN a/lanserv/bmc_sensor.c b/lanserv/bmc_sensor.c
  	if (sensor->event_reading_code == IPMI_EVENT_READING_TYPE_THRESHOLD) {
  	    if (val < 0)
 diff -ruN a/lanserv/bmc_storage.c b/lanserv/bmc_storage.c
---- a/lanserv/bmc_storage.c	2018-06-27 14:56:20.840313000 -0400
-+++ b/lanserv/bmc_storage.c	2018-06-27 15:04:50.745459000 -0400
+--- a/lanserv/bmc_storage.c	2018-10-31 14:35:53.083453000 -0400
++++ b/lanserv/bmc_storage.c	2018-10-31 14:33:14.846650000 -0400
 @@ -280,13 +280,13 @@
  	    chan->set_atn(chan, 1, IPMI_MC_EVBUF_FULL_INT_ENABLED(mc));
      }
@@ -357,8 +357,8 @@ diff -ruN a/lanserv/bmc_storage.c b/lanserv/bmc_storage.c
  	memcpy(rdata + 2, data + offset, count);
      }
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
---- a/lanserv/ipmi_sim.c	2018-06-27 14:56:29.152156000 -0400
-+++ b/lanserv/ipmi_sim.c	2018-06-27 15:05:02.331234000 -0400
+--- a/lanserv/ipmi_sim.c	2018-10-31 14:35:53.087445000 -0400
++++ b/lanserv/ipmi_sim.c	2018-10-31 14:33:34.602255000 -0400
 @@ -92,7 +92,7 @@
  #include <OpenIPMI/serserv.h>
  #ifdef MLX_IPMID
@@ -476,8 +476,8 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
      data.os_hnd->operation_loop(data.os_hnd);
      rv = 0;
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
---- a/lanserv/Makefile.am	2018-06-27 14:56:33.336072000 -0400
-+++ b/lanserv/Makefile.am	2018-06-27 15:05:15.168979000 -0400
+--- a/lanserv/Makefile.am	2018-10-31 14:35:53.090451000 -0400
++++ b/lanserv/Makefile.am	2018-10-31 14:33:57.725811000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
@@ -489,9 +489,9 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
  
  AM_CFLAGS = -Wall -Wsign-compare -I$(top_srcdir)/include -DIPMI_CHECK_LOCKS \
  	$(OPENSSLINCS) -DPVERSION="\"$(PVERSION)\""
-diff -ruN a/lanserv/mlxbw/50-mlxbw-events.rules b/lanserv/mlxbw/50-mlxbw-events.rules
---- a/lanserv/mlxbw/50-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/50-mlxbw-events.rules	2018-06-27 15:04:02.651394000 -0400
+diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
+--- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/71-mlxbw-events.rules	2018-10-31 14:27:35.086573000 -0400
 @@ -0,0 +1,18 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -511,9 +511,9 @@ diff -ruN a/lanserv/mlxbw/50-mlxbw-events.rules b/lanserv/mlxbw/50-mlxbw-events.
 +SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add eeprom_bmc %S %p"
 +SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm eeprom_bmc %S %p"
 +
-diff -ruN a/lanserv/mlxbw/50-mlxbw-hwmon-events.rules b/lanserv/mlxbw/50-mlxbw-hwmon-events.rules
---- a/lanserv/mlxbw/50-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/50-mlxbw-hwmon-events.rules	2018-07-24 16:51:52.543993000 -0400
+diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
+--- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2018-10-31 14:27:35.089555000 -0400
 @@ -0,0 +1,65 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -582,7 +582,7 @@ diff -ruN a/lanserv/mlxbw/50-mlxbw-hwmon-events.rules b/lanserv/mlxbw/50-mlxbw-h
 +SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/lancontrol	2018-07-03 07:34:19.544612000 -0400
++++ b/lanserv/mlxbw/lancontrol	2018-10-31 14:27:35.091565000 -0400
 @@ -0,0 +1,295 @@
 +#!/bin/sh
 +
@@ -881,7 +881,7 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2018-06-27 15:04:02.656389000 -0400
++++ b/lanserv/mlxbw/Makefile.am	2018-10-31 14:50:46.199314000 -0400
 @@ -0,0 +1,24 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
@@ -897,8 +897,8 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	$(INSTALL) -m 775 $(srcdir)/lancontrol "$(DESTDIR)$(sysconfdir)/ipmi/"; \
 +	$(INSTALL) -m 644 $(srcdir)/sdr.20.main "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
 +	$(INSTALL) -m 775 $(srcdir)/sel_set_log_size.sh "$(DESTDIR)$(bindir)"; \
-+	$(INSTALL) -m 775 $(srcdir)/50-mlxbw-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
-+	$(INSTALL) -m 775 $(srcdir)/50-mlxbw-hwmon-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/71-mlxbw-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/71-mlxbw-hwmon-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
 +	$(INSTALL) -m 775 $(srcdir)/mlxbw-hw-events.sh "$(DESTDIR)$(bindir)";
 +
 +uninstall-local:
@@ -909,7 +909,7 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2018-07-18 21:04:48.192014000 -0400
++++ b/lanserv/mlxbw/mlxbw.c	2018-10-31 14:27:35.097570000 -0400
 @@ -0,0 +1,1577 @@
 +/*
 + * mlxbw.c
@@ -2490,7 +2490,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +}
 diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 --- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.hw	2018-07-10 13:17:22.684093000 -0400
++++ b/lanserv/mlxbw/mlxbw.hw	2018-10-31 14:27:35.099592000 -0400
 @@ -0,0 +1,205 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -2699,7 +2699,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +mc_enable 0x20
 diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 --- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2018-07-24 16:51:49.808044000 -0400
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2018-10-31 14:27:35.102548000 -0400
 @@ -0,0 +1,376 @@
 +#!/bin/bash
 +
@@ -3079,7 +3079,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2018-07-03 07:35:20.816357000 -0400
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2018-10-31 14:27:35.104550000 -0400
 @@ -0,0 +1,77 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -3160,7 +3160,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2018-07-25 11:02:19.315075000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2018-10-31 14:27:35.107547000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -4717,7 +4717,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2018-07-24 10:54:25.900700000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2018-10-31 14:27:35.109567000 -0400
 @@ -0,0 +1,31 @@
 +last_add_time:i:1532443877
 +30:d:\1e\00Q\01= \00\1f\07\18\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
@@ -4752,7 +4752,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
 diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
 --- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sel_set_log_size.sh	2018-06-27 15:04:02.669400000 -0400
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2018-10-31 14:27:35.111551000 -0400
 @@ -0,0 +1,21 @@
 +#!/bin/bash
 +

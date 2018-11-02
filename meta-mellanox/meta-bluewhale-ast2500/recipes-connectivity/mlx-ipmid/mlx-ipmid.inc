@@ -12,7 +12,6 @@ DEPENDS = " \
     "
 
 INC_PR = "r2"
-
 inherit autotools gettext update-alternatives systemd pkgconfig
 
 PACKAGECONFIG ??= "net-snmp"
@@ -47,10 +46,10 @@ do_install_append() {
             ${D}/${systemd_unitdir}/system/mlx_ipmid.service
     install -d ${D}${libdir}/mlx_ipmid
     install -m 0644 ${B}/lanserv/mlxbw/.libs/mlxbw.so ${D}${libdir}/mlx_ipmid/
-    install -Dpm 644 ${D}/var/mlx_ipmid/mlxbw/50-mlxbw-events.rules \
-            ${D}/lib/udev/rules.d/50-mlxbw-events.rules
-    install -Dpm 644 ${D}/var/mlx_ipmid/mlxbw/50-mlxbw-hwmon-events.rules \
-            ${D}/lib/udev/rules.d/50-mlxbw-hwmon-events.rules
+    install -Dpm 644 ${D}/var/mlx_ipmid/mlxbw/71-mlxbw-events.rules \
+            ${D}/lib/udev/rules.d/71-mlxbw-events.rules
+    install -Dpm 644 ${D}/var/mlx_ipmid/mlxbw/71-mlxbw-hwmon-events.rules \
+            ${D}/lib/udev/rules.d/71-mlxbw-hwmon-events.rules
     install -d ${D}${sysconfdir}/sudoers.d/
     install -m 0755 ${WORKDIR}/admin ${D}${sysconfdir}/sudoers.d/
 }
