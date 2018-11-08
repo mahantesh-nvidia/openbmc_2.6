@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# mlnx_setup_openbmc script
+#
+# This shell script is part of the software tarball provided to customers,
+# and is run to setup an OpenBMC workspace for building Mellanox BMC code.
+#
+# This script performs the following initialization steps:
+# 1) Performs a 'git clone' to download an OpenBMC workspace from github
+# 2) Performs a 'git checkout' to set the baseline of this OpenBMC workspace
+# 3) Applies our Mellanox-specific patch to this OpenBMC workspace, installing
+#    the changes to build BlueField BMC
+# 4) Applies our Mellanox-specific patch to the U-Boot recipe within OpenBMC
+# 5) Applies our Mellanox-specific patch to the Linux recipe within OpenBMC
+# 6) Modifies two U-Boot bbappend recipes so that U-Boot is enabled to use
+#    upstream github content along with our Mellanox-specific patch
+# 7) Modifies a Linux bbappend recipe so that Linux is enabled to use
+#    upstream github content along with our Mellanox-specific patch
+#
+# After running this script the OpenBMC workspace can be built via these steps:
+# 1) cd openbmc-<upstream-SHA>/
+# 2) export TEMPLATECONF=meta-mellanox/meta-bluewhale-ast2500/conf
+# 3) source oe-init-build-env <build_directory>
+# 4) bitbake obmc-phosphor-image
+#
+# For more details on the OpenBMC project and its build, refer to:
+# 1) https://github.com/openbmc/openbmc
+# 2) https://github.com/openbmc/openbmc/blob/master/README.md
+#
+
+export LINUX_BASE=openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-kernel/linux
+export UBOOT_BASE=openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-bsp/u-boot
+
+./openbmc-@OPENBMC_COMMIT@.patch
+
+cp u-boot-@UBOOT_COMMIT@.patch $UBOOT_BASE/files
+
+cp linux-@LINUX_COMMIT@.patch $LINUX_BASE/linux-aspeed
+
+# Two changes to 'u-boot-aspeed' bbappend recipe:
+#   1) Delete the top 7 lines, essentially reverting to upstream SRC_URI
+#   2) Add logic to specify use of U-Boot patch file
+sed -n '1,7!p' --in-place=.bkup $UBOOT_BASE/u-boot-aspeed_2016.07.bbappend
+cat >> $UBOOT_BASE/u-boot-aspeed_2016.07.bbappend << !
+FILESEXTRAPATHS_prepend := "\${THISDIR}/files:"
+SRC_URI += " file://u-boot-@UBOOT_COMMIT@.patch"
+!
+
+# Two changes to 'u-boot-fw-utils-aspeed' bbappend recipe:
+#   1) Delete the top 7 lines, essentially reverting to upstream SRC_URI
+#   2) Add logic to specify use of U-Boot patch file
+sed -n '1,7!p' --in-place=.bkup $UBOOT_BASE/u-boot-fw-utils-aspeed_2016.07.bbappend
+cat >> $UBOOT_BASE/u-boot-fw-utils-aspeed_2016.07.bbappend << !
+SRC_URI += " file://u-boot-@UBOOT_COMMIT@.patch"
+!
+
+# Three changes to Linux bbappend recipe:
+#   1) Delete the top 8 lines, essentially reverting to upstream SRC_URI
+#   2) Add logic to specify use of Linux patch file
+#   3) Modify KBRANCH, LINUX_VERSION, and SRCREV to point to our Linux upstream baseline
+sed -n '1,8!p' --in-place=.bkup $LINUX_BASE/linux-aspeed_%.bbappend
+cat >> $LINUX_BASE/linux-aspeed_%.bbappend << !
+KBRANCH = "dev-4.17"
+LINUX_VERSION = "4.17.11"
+SRCREV = "@LINUX_COMMIT_LONG@"
+SRC_URI_append_bluewhale-ast2500 = " file://linux-@LINUX_COMMIT@.patch"
+RDEPENDS_\${KERNEL_PACKAGE_NAME}-base = ""
+!

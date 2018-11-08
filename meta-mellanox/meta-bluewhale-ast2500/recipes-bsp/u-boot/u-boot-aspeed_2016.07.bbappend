@@ -1,17 +1,18 @@
+# NOTE: don't change top 7 lines without updating mlnx_setup_openbmc.in
+#
 # Override some values in "u-boot-common-aspeed_2016.07.inc" with
 # specifics of our Git repo, branch names, and source revision.
 SRCREV = "${AUTOREV}"
 UBRANCH = "mlnx-1.0"
 UBOOT_SRC = "git://bu-gerrit.mtbu.labs.mlnx/bmc-u-boot;branch=${UBRANCH}"
 
-# Commit of upstream U-Boot that is our baseline
-UBOOT_COMMIT = "fc8646e"
+# Directory holding recipe-specific files
+OPENBMC_FILES_DIR = "${COREBASE}/meta-mellanox/meta-bluewhale-ast2500/recipes-phosphor/files"
 
-# Path to our U-Boot patch file
-UBOOT_PATCH_DIR = "${DEPLOY_DIR}/mlnx-bmc-sw"
+require ${OPENBMC_FILES_DIR}/mlnx_patch_info.inc
 
 # Name of our U-Boot patch file
-UBOOT_PATCH_NAME = "${UBOOT_PATCH_DIR}/u-boot-${UBOOT_COMMIT}.patch"
+UBOOT_PATCH_NAME = "${OPENBMC_PATCH_DIR}/u-boot-${UBOOT_COMMIT}.patch"
 
 do_deploy_append () {
     if [ -e ${WORKDIR}/build/u-boot-env.bin ] ; then
@@ -19,7 +20,7 @@ do_deploy_append () {
     fi
 
     # Create the directory to hold our U-Boot patch file
-    install -d ${UBOOT_PATCH_DIR}
+    install -d ${OPENBMC_PATCH_DIR}
 
     # Clean out the old U-Boot patch file
     rm -f ${UBOOT_PATCH_NAME}
@@ -56,4 +57,7 @@ exit 0
 
     # Append to our U-Boot patch file with actual git differences
     git diff -u ${UBOOT_COMMIT} HEAD >> ${UBOOT_PATCH_NAME}
+
+    # Allow patch to be executed
+    chmod +x ${UBOOT_PATCH_NAME}
 }

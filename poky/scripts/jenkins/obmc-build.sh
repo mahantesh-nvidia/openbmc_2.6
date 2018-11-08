@@ -174,6 +174,14 @@ ln -sf $(basename ${BMC_FULL_TIMESTAMP_IMAGE}) ${OBMC_RIMAGE}/image-bmc
 # Create MD5 checksum for BMC full image with timestamp in name
 md5sum ${BMC_FULL_TIMESTAMP_IMAGE} > ${OBMC_RIMAGE}/$(basename ${BMC_FULL_TIMESTAMP_IMAGE}).md5sum
 
+# Copy BMC tarball for customer use
+# File naming convention: BlueField-BMC-<version>.tar.xz
+BMC_CUSTOMER_TARBALL=$(ls ${TARGET_IMGSL}/BlueField-BMC-*.tar.xz)
+cp ${BMC_CUSTOMER_TARBALL} ${OBMC_RIMAGE}
+
+# Create MD5 checksum for BMC tarball
+md5sum ${BMC_CUSTOMER_TARBALL} > ${OBMC_RIMAGE}/$(basename ${BMC_CUSTOMER_TARBALL}).md5sum
+
 # Generate the BMC datetime based off field in full image filename
 BMC_DATETIME=`echo $(basename ${BMC_FULL_TIMESTAMP_IMAGE}) | cut -d "-" -f 6 | cut -d "." -f 1`
 
