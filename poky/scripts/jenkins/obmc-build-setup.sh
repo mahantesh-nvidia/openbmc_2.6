@@ -39,9 +39,6 @@ IMAGE=${WORKSPACE}/images
 # Setup the remote directory for building OpenBMC images. We expect
 # that the build directory size is at least 21GB.
 OBMC_RBUILD=/scratch/$USER/obmc-build/${BUILD_TYPE}
-# Setup the remote images directory. This is intended to contain
-# the build products that might be tested.
-OBMC_RIMAGE=${OBMC_RBUILD}/images
 
 # Set the OpenBMC target image to build
 BUILD_TARGET=bluewhale
@@ -108,6 +105,10 @@ fi
 # the checker.
 sed -i '/status.addresult(check_not_nfs(tmpdir, "TMPDIR"))/d' \
     ${OBMC_SRC}/poky/meta/classes/sanity.bbclass
+
+# Setup the remote images directory. This is intended to contain
+# the build products that might be tested.
+OBMC_RIMAGE=${OBMC_RBUILD}/images
 
 # Kick off the remote build; this should run for both nightly and OpenBMC
 # verification.

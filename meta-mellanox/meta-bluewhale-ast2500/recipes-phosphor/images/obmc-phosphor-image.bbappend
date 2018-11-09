@@ -97,7 +97,7 @@ create_sw_tarball() {
     cd ${OPENBMC_PATCH_DIR}
 
     # Create the customer tarball, using proper version in file name
-    tar cf ${DEPLOY_DIR_IMAGE}/BlueField-BMC-${VERSION}.tar.xz *
+    tar cfJ ${DEPLOY_DIR_IMAGE}/BlueField-BMC-${VERSION}.tar.xz *
 }
 
 ROOTFS_POSTPROCESS_COMMAND += "create_sw_tarball; "
