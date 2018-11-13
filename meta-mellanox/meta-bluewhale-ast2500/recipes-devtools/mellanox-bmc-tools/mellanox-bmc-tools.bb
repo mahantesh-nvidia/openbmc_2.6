@@ -14,6 +14,18 @@ S = "${WORKDIR}/git"
 
 inherit module
 
+# Directory holding recipe-specific files
+OPENBMC_FILES_DIR = "${COREBASE}/meta-mellanox/meta-bluewhale-ast2500/recipes-phosphor/files"
+
+require ${OPENBMC_FILES_DIR}/mlnx_patch_info.inc
+
+# Create source code tarball for Mellanox BMC tools
+do_compile_prepend() {
+    install -d ${OPENBMC_PATCH_DIR}
+    cd ${S}
+    tar cfz ${OPENBMC_PATCH_DIR}/mellanox-bmc-tools.tar.gz *
+}
+
 do_compile() {
     cd ${B}/mlnx_clkprog
     oe_runmake CC="${CC}"

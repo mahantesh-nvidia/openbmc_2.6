@@ -59,7 +59,9 @@ exit 0
     cd ${COREBASE}
 
     # Append to our OpenBMC patch file with actual git differences
-    git diff -u ${OPENBMC_COMMIT} HEAD >> ${OPENBMC_PATCH_NAME}
+    # NOTE: Exclude internal-only tools (like MFT) from 'git diff'
+    git diff -u ${OPENBMC_COMMIT} HEAD -- . \
+        ':!meta-mellanox/meta-bluewhale-ast2500/recipes-devtools/mft-tools' >> ${OPENBMC_PATCH_NAME}
 
     # Allow patch to be executed
     chmod +x ${OPENBMC_PATCH_NAME}

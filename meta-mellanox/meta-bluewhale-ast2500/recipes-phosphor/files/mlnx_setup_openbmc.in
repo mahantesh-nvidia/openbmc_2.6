@@ -30,12 +30,17 @@
 
 export LINUX_BASE=openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-kernel/linux
 export UBOOT_BASE=openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-bsp/u-boot
+export TOOLS_BASE=openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-devtools/mellanox-bmc-tools
 
 ./openbmc-@OPENBMC_COMMIT@.patch
 
 cp u-boot-@UBOOT_COMMIT@.patch $UBOOT_BASE/files
 
 cp linux-@LINUX_COMMIT@.patch $LINUX_BASE/linux-aspeed
+
+# Copy Mellanox BMC tools tarball to correct "files" directory
+install -d $TOOLS_BASE/files
+cp mellanox-bmc-tools.tar.gz $TOOLS_BASE/files
 
 # Two changes to 'u-boot-aspeed' bbappend recipe:
 #   1) Delete the top 7 lines, essentially reverting to upstream SRC_URI
@@ -66,3 +71,12 @@ SRCREV = "@LINUX_COMMIT_LONG@"
 SRC_URI_append_bluewhale-ast2500 = " file://linux-@LINUX_COMMIT@.patch"
 RDEPENDS_\${KERNEL_PACKAGE_NAME}-base = ""
 !
+
+# Change obmc-image-phosphor.bbappend recipe to remove MFT tools
+sed '/mft-tools/d' --in-place=.bkup \
+  openbmc-@OPENBMC_COMMIT@/meta-mellanox/meta-bluewhale-ast2500/recipes-phosphor/images/obmc-phosphor-image.bbappend
+
+# Change mellanox-bmc-tools.bbappend recipe to build with tools tarball
+sed 's/git:\/\/bu-gerrit.mtbu.labs.mlnx\/bmc-mellanox-bmc-tools/file:\/\/mellanox-bmc-tools.tar.gz/' \
+  --in-place=.bkup $TOOLS_BASE/mellanox-bmc-tools.bb
+sed -i 's/WORKDIR\}\/git/WORKDIR\}/' $TOOLS_BASE/mellanox-bmc-tools.bb

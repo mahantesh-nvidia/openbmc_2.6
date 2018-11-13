@@ -87,6 +87,15 @@ if [ -f /etc/redhat-release ]; then
       echo "Using devtoolset-2 for GCC toolchain for CentOS 6"
       PATH=/opt/rh/devtoolset-2/root/usr/bin:$PATH
   elif grep -q "release 7" /etc/redhat-release; then
+      # By default, git is found at /usr/bin and is version 1.8.3.
+      # The new logic to create patches uses git pathspecs, which requires
+      # a minimum of git 1.9.5.  Add /home/global/Linux-x86_64-rhel7 to the
+      # PATH in order to bring in newer git (2.1.2) to BMC build.
+      global=/home/global/Linux-x86_64-rhel7
+      if [ -d $global ]; then
+          echo 'Adding /home/global/Linux-x86_64-rhel7 to $PATH for newer git'
+          PATH=$global/bin:$PATH
+      fi
       if [ ! -f /usr/bin/python3 ]; then
           echo "Missing /usr/bin/python3; try yum install epel-release python34"
       fi
