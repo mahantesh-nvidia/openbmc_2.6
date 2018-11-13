@@ -2,8 +2,8 @@
 UBOOT_COMMIT = "fc8646e"
 
 # Commit of upstream Linux that is our baseline
-LINUX_COMMIT_LONG = "db64579331df4ff9d9c2706601fdb41978192a09"
-LINUX_COMMIT = "db64579"
+LINUX_COMMIT_LONG = "d653b87e2a26221e9ca1fb230439bfea18572d36"
+LINUX_COMMIT = "d653b87"
 
 # Commit of upstream OpenBMC that is our baseline
 OPENBMC_COMMIT = "9afb671"
