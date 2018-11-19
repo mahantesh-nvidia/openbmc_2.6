@@ -904,7 +904,7 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +uninstall-local:
 +	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/mlxbw.lan.conf"
 +	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/mlxbw.hw"
-+	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/sdr.20.main"
++	-rm -f "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/sdr.20.main"
 +	-rm -f "$(DESTDIR)$(bindir)/sel_set_log_size.sh"
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
