@@ -95,6 +95,9 @@ create_sw_tarball() {
     # Fetch the OpenBMC version via 'git describe' command
     VERSION=`git describe | cut -f 1,2 -d '-'`
 
+    # Copy the README help file into the OpenBMC patch directory
+    cp ${OPENBMC_FILES_DIR}/README ${OPENBMC_PATCH_DIR}
+
     # Go to our OpenBMC patch directory
     cd ${OPENBMC_PATCH_DIR}
 

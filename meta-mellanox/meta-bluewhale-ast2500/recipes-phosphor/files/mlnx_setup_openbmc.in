@@ -16,6 +16,7 @@
 #    upstream github content along with our Mellanox-specific patch
 # 7) Modifies a Linux bbappend recipe so that Linux is enabled to use
 #    upstream github content along with our Mellanox-specific patch
+# 8) Modifies the Mellanox tools bbappend recipe to build with source code tarball
 #
 # After running this script the OpenBMC workspace can be built via these steps:
 # 1) cd openbmc-<upstream-SHA>/
@@ -80,3 +81,4 @@ sed '/mft-tools/d' --in-place=.bkup \
 sed 's/git:\/\/bu-gerrit.mtbu.labs.mlnx\/bmc-mellanox-bmc-tools/file:\/\/mellanox-bmc-tools.tar.gz/' \
   --in-place=.bkup $TOOLS_BASE/mellanox-bmc-tools.bb
 sed -i 's/WORKDIR\}\/git/WORKDIR\}/' $TOOLS_BASE/mellanox-bmc-tools.bb
+sed -i '/tar cfz/d' $TOOLS_BASE/mellanox-bmc-tools.bb
