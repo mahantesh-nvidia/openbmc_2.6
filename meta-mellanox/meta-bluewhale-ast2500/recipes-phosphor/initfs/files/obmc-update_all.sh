@@ -15,14 +15,14 @@
 #    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
-version="03/15/2018"
+version="11/28/2018"
 echo $0: script version $version
 
 if [ -z $1 ]
 then
    echo $0: No BMC image file specified, exiting
    echo $0: syntax: update_all \<bmc-image-file\>
-   exit
+   exit 1
 fi
 
 if [ -f $1 ]
@@ -30,7 +30,7 @@ then
    echo $0: Update BMC SPI Flash with $1
 else
    echo $0: File $1 not found on target, exiting
-   exit
+   exit 1
 fi
 
 # Get the total size (in hex) of the "bmc" partition
@@ -43,7 +43,7 @@ imagesize=`wc -c $1 | cut -d " " -f1`
 if [ $imagesize -ne $((0x${mtdsize})) ]
 then
     echo Size of BMC image file must exactly match size of MTD partition, exiting
-    exit
+    exit 1
 fi
 
 MAC=`/sbin/fw_printenv ethaddr | sed -n "s/^ethaddr=//p"`
@@ -107,7 +107,7 @@ do
             echo $0: Excessive flashcp failures, boot BMC into recovery
             echo $0: mode by issuing the command \"reboot -f\" and then
             echo $0: in U-Boot issue the command \"run recovery_mode\"
-            exit
+            exit 1
         fi
     fi
 done

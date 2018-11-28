@@ -60,8 +60,6 @@ do_install() {
     install -m 0755 ${B}/mlnx_poweron_bf.sh ${D}${sbindir}/mlnx_poweron_bf
     install -m 0755 ${B}/mlnx_poweroff_bf.sh ${D}${sbindir}/mlnx_poweroff_bf
     install -m 0644 ${B}/images/*.svf ${D}/usr/share/mellanox
-    install -m 0644 ${B}/images/aspeed-bmc-mlx-bluewhale2u.dtb ${D}/usr/share/mellanox
-    install -m 0644 ${B}/images/aspeed-bmc-mlx-bluetang.dtb ${D}/usr/share/mellanox
 }
 
 FILES_${PN} += "${sbindir} ./usr/share"

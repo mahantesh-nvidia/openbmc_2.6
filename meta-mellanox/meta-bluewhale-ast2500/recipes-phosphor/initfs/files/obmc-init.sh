@@ -18,7 +18,7 @@ fi
 
 mkdir -p $rodir $rwdir
 
-cp -rp init failsafe recovery shutdown update update_all update_dtb \
+cp -rp init failsafe recovery shutdown update update_all \
        whitelist bin sbin usr lib etc var run/initramfs
 
 # To start a interactive shell with job control at this point, run
