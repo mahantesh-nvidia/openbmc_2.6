@@ -1,4 +1,4 @@
-Mellanox BlueField BMC README (last modified 11/21/2018)
+Mellanox BlueField BMC README (last modified 12/03/2018)
 
 Introduction
 ============
@@ -13,7 +13,7 @@ The OpenBMC project's source code and documentation can be found at:
 The BlueField BMC image includes many software components, but the
 important software components to note are listed below:
     U-Boot bootloader (v2016.07)
-    Linux kernel (v4.17.11)
+    Linux kernel (v4.18.16)
     OpenBMC distro (v2.3)
     OpenIPMI package (v2.0.22)
 
