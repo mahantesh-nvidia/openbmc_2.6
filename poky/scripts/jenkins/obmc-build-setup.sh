@@ -11,7 +11,7 @@ set -exo pipefail
 
 # Setup default variables
 BUILD_TYPE={$BUILD_TYPE:-verify}
-BMC_RELEASE=master_dev
+BMC_RELEASE=master
 
 # Build process type is passed as an optional argument
 if [ $# -ge 1 ]; then
