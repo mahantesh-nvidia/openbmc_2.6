@@ -60,13 +60,11 @@ make -j$(nproc) ${COMPILE_ARGS} O=${UBOOT_BUILD_DIR} \
     2>&1 | tee -a ${LOG}
 
 # Copy target binaries
-cp ${UBOOT_BUILD_DIR}/u-boot-env.bin ${UBOOT_IMAGE}/image-u-boot-env.bin
 cp ${UBOOT_BUILD_DIR}/u-boot.bin ${UBOOT_IMAGE}/image-u-boot.bin
 
 cat >> ${LOG} << EOF_DATA
 echo "Build binaries are in ${UBOOT_IMAGE}"
 echo "    U-Boot image         - image-u-boot.bin"
-echo "    U-boot Env Variables - image-u-boot-env.bin"
 EOF_DATA
 
 # Timestamp for build completion

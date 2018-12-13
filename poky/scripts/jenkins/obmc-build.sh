@@ -205,9 +205,5 @@ ln -sf u-boot-${TARGET}-${BMC_DATETIME} ${OBMC_RIMAGE}/image-u-boot
 # Create MD5 checksum for BMC U-Boot image with version in name
 md5sum ${BMC_UBOOT_VERSION_IMAGE} > ${OBMC_RIMAGE}/u-boot-${TARGET}-${BMC_DATETIME}.md5sum
 
-# Create U-Boot environment file with same timestamp
-mv ${OBMC_RIMAGE}/image-u-boot-env ${OBMC_RIMAGE}/u-boot-env-${TARGET}-${BMC_DATETIME}
-ln -sf u-boot-env-${TARGET}-${BMC_DATETIME} ${OBMC_RIMAGE}/image-u-boot-env
-
 # Timestamp for build completion
 echo "${BITBAKE_IMG}: ${TARGET} build completed, $(date)" >> ${LOG}
