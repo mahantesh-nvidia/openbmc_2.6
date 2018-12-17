@@ -46,8 +46,11 @@ then
     exit 1
 fi
 
+# Retrieve current settings for U-Boot environment variables
+# we want to restore after the full BMC image update
 MAC=`/sbin/fw_printenv ethaddr | sed -n "s/^ethaddr=//p"`
 MAC1=`/sbin/fw_printenv eth1addr | sed -n "s/^eth1addr=//p"`
+BOOTCMD_STRING=`/sbin/fw_printenv bootcmd_string | sed -n "s/^bootcmd_string=//p"`
 
 echo $0: Stopping system services
 systemctl stop mlx_ipmid
@@ -111,6 +114,12 @@ do
         fi
     fi
 done
+
+# Restore the setting of bootcmd_string, this is where the user would set
+# the bootm option to boot with a non-default fitImage configuration, e.g.
+#    bootcmd_string=bootm 0x20070000#conf@aspeed-bmc-mlx-bluewhale2u.dtb
+# to boot the Blue Whale 2U BMC.
+/sbin/fw_setenv bootcmd_string $BOOTCMD_STRING
 
 if [ -v $MAC ] || [ $MAC == "ff:ff:ff:ff:ff:ff" ]; then
     echo "Valid MAC env variable does not exist. Set eth0 MAC from eeprom."
