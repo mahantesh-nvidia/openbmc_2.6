@@ -15,7 +15,7 @@
 #    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
-version="11/28/2018"
+version="12/19/2018"
 echo $0: script version $version
 
 if [ -z $1 ]
@@ -119,7 +119,11 @@ done
 # the bootm option to boot with a non-default fitImage configuration, e.g.
 #    bootcmd_string=bootm 0x20070000#conf@aspeed-bmc-mlx-bluewhale2u.dtb
 # to boot the Blue Whale 2U BMC.
-/sbin/fw_setenv bootcmd_string $BOOTCMD_STRING
+if [ -z "$BOOTCMD_STRING" ]; then
+    /sbin/fw_setenv bootcmd_string bootm 0x20070000
+else
+    /sbin/fw_setenv bootcmd_string $BOOTCMD_STRING
+fi
 
 if [ -v $MAC ] || [ $MAC == "ff:ff:ff:ff:ff:ff" ]; then
     echo "Valid MAC env variable does not exist. Set eth0 MAC from eeprom."
