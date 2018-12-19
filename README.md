@@ -21,10 +21,10 @@ customization for your server platform.
 sudo apt-get install -y git build-essential libsdl1.2-dev texinfo gawk chrpath diffstat
 ```
 
-- Fedora 23
+- Fedora 28
 
 ```
-sudo dnf install -y git patch diffstat texinfo chrpath SDL-devel bitbake
+sudo dnf install -y git patch diffstat texinfo chrpath SDL-devel bitbake rpcgen
 sudo dnf groupinstall "C Development Tools and Libraries"
 ```
 ### 2) Download the source
@@ -46,6 +46,7 @@ Machine | TEMPLATECONF
 Palmetto | ```meta-ibm/meta-palmetto/conf```
 Zaius| ```meta-ingrasys/meta-zaius/conf```
 Witherspoon| ```meta-ibm/meta-witherspoon/conf```
+Romulus| ```meta-ibm/meta-romulus/conf```
 
 
 As an example target Palmetto

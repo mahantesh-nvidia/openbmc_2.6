@@ -1,4 +1,3 @@
-namespace_dir="${datadir}/phosphor-mapper/namespace"
+service_dir="${datadir}/phosphor-mapper/service"
 interface_dir="${datadir}/phosphor-mapper/interface"
-blacklist_dir="${datadir}/phosphor-mapper/blacklist"
-interfaceblacklist_dir="${datadir}/phosphor-mapper/interfaceblacklist"
+serviceblacklist_dir="${datadir}/phosphor-mapper/serviceblacklist"
