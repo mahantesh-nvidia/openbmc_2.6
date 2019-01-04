@@ -1,4 +1,4 @@
-Mellanox BlueField BMC README (last modified 12/03/2018)
+Mellanox BlueField BMC README (last modified 01/04/2019)
 
 Introduction
 ============
@@ -14,7 +14,7 @@ The BlueField BMC image includes many software components, but the
 important software components to note are listed below:
     U-Boot bootloader (v2016.07)
     Linux kernel (v4.18.16)
-    OpenBMC distro (v2.3)
+    OpenBMC distro (v2.4)
     OpenIPMI package (v2.0.22)
 
 

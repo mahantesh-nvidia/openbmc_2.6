@@ -15,7 +15,7 @@
 #    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
-version="12/19/2018"
+version="01/04/2019"
 echo $0: script version $version
 
 if [ -z $1 ]
@@ -51,6 +51,10 @@ fi
 MAC=`/sbin/fw_printenv ethaddr | sed -n "s/^ethaddr=//p"`
 MAC1=`/sbin/fw_printenv eth1addr | sed -n "s/^eth1addr=//p"`
 BOOTCMD_STRING=`/sbin/fw_printenv bootcmd_string | sed -n "s/^bootcmd_string=//p"`
+
+# Look for fitImage string signature within image to be programmed
+# The 'bootcmd_string' value is determined by the new image type.
+FIT_IMAGE_STRING=`/usr/bin/strings $1 | grep 'fitImage for Mellanox BMC'`
 
 echo $0: Stopping system services
 systemctl stop mlx_ipmid
@@ -119,10 +123,17 @@ done
 # the bootm option to boot with a non-default fitImage configuration, e.g.
 #    bootcmd_string=bootm 0x20070000#conf@aspeed-bmc-mlx-bluewhale2u.dtb
 # to boot the Blue Whale 2U BMC.
-if [ -z "$BOOTCMD_STRING" ]; then
-    /sbin/fw_setenv bootcmd_string bootm 0x20070000
+if [ -z "$FIT_IMAGE_STRING" ]; then
+    # Image to be programmed is NOT using fitImage format (uImage instead)
+    # Set 'bootcmd_string' to pass 3 arguments to bootm command
+    /sbin/fw_setenv bootcmd_string bootm 0x20070000 0x20360000 0x20350000
 else
-    /sbin/fw_setenv bootcmd_string $BOOTCMD_STRING
+    # Image to be programmed is using fitImage format
+    if [ -z "$BOOTCMD_STRING" ]; then
+        /sbin/fw_setenv bootcmd_string bootm 0x20070000
+    else
+        /sbin/fw_setenv bootcmd_string $BOOTCMD_STRING
+    fi
 fi
 
 if [ -v $MAC ] || [ $MAC == "ff:ff:ff:ff:ff:ff" ]; then
