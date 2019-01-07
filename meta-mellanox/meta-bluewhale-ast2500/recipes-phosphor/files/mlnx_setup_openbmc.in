@@ -66,8 +66,8 @@ SRC_URI += " file://u-boot-@UBOOT_COMMIT@.patch"
 #   3) Modify KBRANCH, LINUX_VERSION, and SRCREV to point to our Linux upstream baseline
 sed -n '1,8!p' --in-place=.bkup $LINUX_BASE/linux-aspeed_%.bbappend
 cat >> $LINUX_BASE/linux-aspeed_%.bbappend << !
-KBRANCH = "dev-4.18"
-LINUX_VERSION = "4.18.16"
+KBRANCH = "dev-4.19"
+LINUX_VERSION = "4.19.13"
 SRCREV = "@LINUX_COMMIT_LONG@"
 SRC_URI_append_bluewhale-ast2500 = " file://linux-@LINUX_COMMIT@.patch"
 RDEPENDS_\${KERNEL_PACKAGE_NAME}-base = ""
