@@ -3,6 +3,7 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " tcpdump \
                                     xinetd \
                                     mft-tools \
                                     mellanox-bmc-tools \
+                                    ipmitool \
                                     mlx-ipmid \
                                     obmc-mellanox-fand \
                                     bridge-utils \
