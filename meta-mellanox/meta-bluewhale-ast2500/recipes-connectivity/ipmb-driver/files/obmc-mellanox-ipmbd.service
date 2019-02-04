@@ -1,0 +1,10 @@
+[Unit]
+Description=Mellanox IPMB driver loader
+
+[Service]
+Restart=always
+RestartSec=60
+ExecStart={sbindir}/obmc-mellanox-ipmbd.sh
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}
