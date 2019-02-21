@@ -22,8 +22,8 @@ IMAGE_FSTYPES = "wic.vmdk"
 
 inherit core-image module-base setuptools3
 
-SRCREV ?= "2464dd404041a7a00b18e42950cbf4719180141d"
-SRC_URI = "git://git.yoctoproject.org/poky;branch=sumo \
+SRCREV ?= "ca417455d79b29cd14cd8d39a9da904bf23fcc48"
+SRC_URI = "git://git.yoctoproject.org/poky;branch=thud \
            file://Yocto_Build_Appliance.vmx \
            file://Yocto_Build_Appliance.vmxf \
            file://README_VirtualBox_Guest_Additions.txt \
@@ -59,8 +59,10 @@ fakeroot do_populate_poky_src () {
 	cp ${WORKDIR}/README_VirtualBox_Toaster.txt ${IMAGE_ROOTFS}/home/builder/
 
 	# Create a symlink, needed for out-of-tree kernel modules build
-	rm -f  ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
-	lnr ${IMAGE_ROOTFS}${KERNEL_SRC_PATH} ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
+	if [ ! -e ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build ]; then
+		rm -f  ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
+		lnr ${IMAGE_ROOTFS}${KERNEL_SRC_PATH} ${IMAGE_ROOTFS}/lib/modules/${KERNEL_VERSION}/build
+	fi
 
 	echo "INHERIT += \"rm_work\"" >> ${IMAGE_ROOTFS}/home/builder/poky/build/conf/auto.conf
 	echo "export LC_ALL=en_US.utf8" >> ${IMAGE_ROOTFS}/home/builder/.bashrc
@@ -77,7 +79,7 @@ fakeroot do_populate_poky_src () {
 	echo "# export ALL_PROXY=https://proxy.example.com:8080" >> ${IMAGE_ROOTFS}/home/builder/.bashrc
 	echo "# export ALL_PROXY=socks://socks.example.com:1080" >> ${IMAGE_ROOTFS}/home/builder/.bashrc
 
-	chown -R builder.builder ${IMAGE_ROOTFS}/home/builder/poky
+	chown -R builder:builder ${IMAGE_ROOTFS}/home/builder/poky
 	chmod -R ug+rw ${IMAGE_ROOTFS}/home/builder/poky
 
 	# Assume we will need CDROM to install guest additions
@@ -105,8 +107,8 @@ fakeroot do_populate_poky_src () {
 	   pip3_install_params="${pip3_install_params} --proxy ${http_proxy}"
 	fi
 	pip3 install ${pip3_install_params}
-	chown -R builder.builder ${IMAGE_ROOTFS}/home/builder/.local
-	chown -R builder.builder ${IMAGE_ROOTFS}/home/builder/.cache
+	chown -R builder:builder ${IMAGE_ROOTFS}/home/builder/.local
+	chown -R builder:builder ${IMAGE_ROOTFS}/home/builder/.cache
 }
 
 IMAGE_PREPROCESS_COMMAND += "do_populate_poky_src; "
@@ -114,9 +116,9 @@ IMAGE_PREPROCESS_COMMAND += "do_populate_poky_src; "
 addtask rootfs after do_unpack
 
 python () {
-	# Ensure we run these usually noexec tasks
-	d.delVarFlag("do_fetch", "noexec")
-	d.delVarFlag("do_unpack", "noexec")
+    # Ensure we run these usually noexec tasks
+    d.delVarFlag("do_fetch", "noexec")
+    d.delVarFlag("do_unpack", "noexec")
 }
 
 create_bundle_files () {

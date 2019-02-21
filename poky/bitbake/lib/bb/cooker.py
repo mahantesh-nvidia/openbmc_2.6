@@ -175,17 +175,30 @@ class BBCooker:
 
         self.configuration = configuration
 
+        bb.debug(1, "BBCooker starting %s" % time.time())
+        sys.stdout.flush()
+
         self.configwatcher = pyinotify.WatchManager()
+        bb.debug(1, "BBCooker pyinotify1 %s" % time.time())
+        sys.stdout.flush()
+
         self.configwatcher.bbseen = []
         self.configwatcher.bbwatchedfiles = []
         self.confignotifier = pyinotify.Notifier(self.configwatcher, self.config_notifications)
+        bb.debug(1, "BBCooker pyinotify2 %s" % time.time())
+        sys.stdout.flush()
         self.watchmask = pyinotify.IN_CLOSE_WRITE | pyinotify.IN_CREATE | pyinotify.IN_DELETE | \
                          pyinotify.IN_DELETE_SELF | pyinotify.IN_MODIFY | pyinotify.IN_MOVE_SELF | \
                          pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO
         self.watcher = pyinotify.WatchManager()
+        bb.debug(1, "BBCooker pyinotify3 %s" % time.time())
+        sys.stdout.flush()
         self.watcher.bbseen = []
         self.watcher.bbwatchedfiles = []
         self.notifier = pyinotify.Notifier(self.watcher, self.notifications)
+
+        bb.debug(1, "BBCooker pyinotify complete %s" % time.time())
+        sys.stdout.flush()
 
         # If being called by something like tinfoil, we need to clean cached data
         # which may now be invalid
@@ -195,6 +208,9 @@ class BBCooker:
         self.ui_cmdline = None
 
         self.initConfigurationData()
+
+        bb.debug(1, "BBCooker parsed base configuration %s" % time.time())
+        sys.stdout.flush()
 
         # we log all events to a file if so directed
         if self.configuration.writeeventlog:
@@ -232,6 +248,9 @@ class BBCooker:
         signal.signal(signal.SIGTERM, self.sigterm_exception)
         # Let SIGHUP exit as SIGTERM
         signal.signal(signal.SIGHUP, self.sigterm_exception)
+
+        bb.debug(1, "BBCooker startup complete %s" % time.time())
+        sys.stdout.flush()
 
     def process_inotify_updates(self):
         for n in [self.confignotifier, self.notifier]:
@@ -620,6 +639,38 @@ class BBCooker:
             runlist.append([mc, k, ktask, fn])
             bb.event.fire(bb.event.TreeDataPreparationProgress(current, len(fulltargetlist)), self.data)
 
+
+        # No need to do check providers if there are no mcdeps or not an mc build
+        if mc:
+            # Add unresolved first, so we can get multiconfig indirect dependencies on time
+            for mcavailable in self.multiconfigs:
+                # The first element is empty
+                if mcavailable:
+                    taskdata[mcavailable].add_unresolved(localdata[mcavailable], self.recipecaches[mcavailable])
+
+
+            mcdeps = taskdata[mc].get_mcdepends()
+
+            if mcdeps:
+                # Make sure we can provide the multiconfig dependency
+                seen = set()
+                new = True
+                while new:
+                    new = False
+                    for mc in self.multiconfigs:
+                        for k in mcdeps:
+                            if k in seen:
+                                continue
+                            l = k.split(':')
+                            depmc = l[2]
+                            if depmc not in self.multiconfigs:
+                                bb.fatal("Multiconfig dependency %s depends on nonexistent mc configuration %s" % (k,depmc))
+                            else:
+                                logger.debug(1, "Adding providers for multiconfig dependency %s" % l[3])
+                                taskdata[depmc].add_provider(localdata[depmc], self.recipecaches[depmc], l[3])
+                                seen.add(k)
+                                new = True
+
         for mc in self.multiconfigs:
             taskdata[mc].add_unresolved(localdata[mc], self.recipecaches[mc])
 
@@ -706,8 +757,8 @@ class BBCooker:
             if not dotname in depend_tree["tdepends"]:
                 depend_tree["tdepends"][dotname] = []
             for dep in rq.rqdata.runtaskentries[tid].depends:
-                (depmc, depfn, deptaskname, deptaskfn) = bb.runqueue.split_tid_mcfn(dep)
-                deppn = self.recipecaches[mc].pkg_fn[deptaskfn]
+                (depmc, depfn, _, deptaskfn) = bb.runqueue.split_tid_mcfn(dep)
+                deppn = self.recipecaches[depmc].pkg_fn[deptaskfn]
                 depend_tree["tdepends"][dotname].append("%s.%s" % (deppn, bb.runqueue.taskname_from_tid(dep)))
             if taskfn not in seen_fns:
                 seen_fns.append(taskfn)
@@ -1566,7 +1617,7 @@ class BBCooker:
                     pkgs_to_build.append(t)
 
         if 'universe' in pkgs_to_build:
-            parselog.warning("The \"universe\" target is only intended for testing and may produce errors.")
+            parselog.verbnote("The \"universe\" target is only intended for testing and may produce errors.")
             parselog.debug(1, "collating packages for \"universe\"")
             pkgs_to_build.remove('universe')
             for mc in self.multiconfigs:
@@ -1633,7 +1684,10 @@ class CookerExit(bb.event.Event):
 class CookerCollectFiles(object):
     def __init__(self, priorities):
         self.bbappends = []
-        self.bbfile_config_priorities = priorities
+        # Priorities is a list of tupples, with the second element as the pattern.
+        # We need to sort the list with the longest pattern first, and so on to
+        # the shortest.  This allows nested layers to be properly evaluated.
+        self.bbfile_config_priorities = sorted(priorities, key=lambda tup: tup[1], reverse=True)
 
     def calc_bbfile_priority( self, filename, matched = None ):
         for _, _, regex, pri in self.bbfile_config_priorities:

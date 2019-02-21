@@ -14,6 +14,10 @@ inherit pythonnative
 
 PACKAGECONFIG[verify_pnor_signature] = "--enable-verify_pnor_signature,--disable-verify_pnor_signature"
 
+EXTRA_OECONF += " \
+    PNOR_MSL="v2.0.10 v2.2" \
+    "
+
 DEPENDS += " \
         autoconf-archive-native \
         phosphor-dbus-interfaces \
@@ -36,7 +40,7 @@ SRC_URI += "git://github.com/openbmc/openpower-pnor-code-mgmt"
 
 SRC_URI += "file://obmc-flash-bios"
 
-SRCREV = "ea4e6aee07f61d0c076fd5f8f13808604523cda2"
+SRCREV = "17f55a823134a35b7847b2ae4077ae81f9c0cf79"
 
 do_install_append() {
         install -d ${D}${sbindir}

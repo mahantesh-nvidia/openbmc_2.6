@@ -1,10 +1,10 @@
-KBRANCH ?= "v4.14/standard/tiny/common-pc"
+KBRANCH ?= "v4.14/standard/tiny/base"
 LINUX_KERNEL_TYPE = "tiny"
 KCONFIG_MODE = "--allnoconfig"
 
 require recipes-kernel/linux/linux-yocto.inc
 
-LINUX_VERSION ?= "4.14.67"
+LINUX_VERSION ?= "4.14.79"
 
 DEPENDS += "${@bb.utils.contains('ARCH', 'x86', 'elfutils-native', '', d)}"
 DEPENDS += "openssl-native util-linux-native"
@@ -12,8 +12,8 @@ DEPENDS += "openssl-native util-linux-native"
 KMETA = "kernel-meta"
 KCONF_BSP_AUDIT_LEVEL = "2"
 
-SRCREV_machine ?= "74ecbeb03ebfc2b9a73a6554924b043b903295f5"
-SRCREV_meta ?= "c43c9e19a22367b48c0f62764c8555643d2a6844"
+SRCREV_machine ?= "6ce17eae5d962b30846a5258956246438d68d60a"
+SRCREV_meta ?= "6a3254e7b370cbb86c1f73379dcf38885c1c69e0"
 
 PV = "${LINUX_VERSION}+git${SRCPV}"
 

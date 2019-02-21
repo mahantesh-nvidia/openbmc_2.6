@@ -14,7 +14,7 @@ The BlueField BMC image includes many software components, but the
 important software components to note are listed below:
     U-Boot bootloader (v2016.07)
     Linux kernel (v4.19.13)
-    OpenBMC distro (v2.4)
+    OpenBMC distro (v2.6)
     OpenIPMI package (v2.0.22)
 
 

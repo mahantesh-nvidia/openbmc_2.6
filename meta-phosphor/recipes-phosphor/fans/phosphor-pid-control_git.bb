@@ -6,7 +6,7 @@ PV = "0.1+git${SRCPV}"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
-inherit autotools pkgconfig
+inherit flto-automake pkgconfig
 inherit pythonnative
 
 inherit phosphor-pid-control
@@ -14,7 +14,7 @@ inherit obmc-phosphor-ipmiprovider-symlink
 
 S = "${WORKDIR}/git"
 SRC_URI = "git://github.com/openbmc/phosphor-pid-control"
-SRCREV = "ba3c8c1c15ab10e3c9ad287c93d8a7598addc22f"
+SRCREV = "e54c7fffbbbe39e6426e395f0ef846ec91b722d6"
 
 # Each platform will need a service file that starts
 # at an appropriate time per system.  For instance, if

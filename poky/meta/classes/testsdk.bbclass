@@ -14,6 +14,30 @@
 #
 # where "<image-name>" is an image like core-image-sato.
 
+def get_sdk_configuration(d, test_type):
+    import platform
+    from oeqa.utils.metadata import get_layers
+    configuration = {'TEST_TYPE': test_type,
+                    'MACHINE': d.getVar("MACHINE"),
+                    'SDKMACHINE': d.getVar("SDKMACHINE"),
+                    'IMAGE_BASENAME': d.getVar("IMAGE_BASENAME"),
+                    'IMAGE_PKGTYPE': d.getVar("IMAGE_PKGTYPE"),
+                    'STARTTIME': d.getVar("DATETIME"),
+                    'HOST_DISTRO': oe.lsb.distro_identifier().replace(' ', '-'),
+                    'LAYERS': get_layers(d.getVar("BBLAYERS"))}
+    return configuration
+get_sdk_configuration[vardepsexclude] = "DATETIME"
+
+def get_sdk_json_result_dir(d):
+    json_result_dir = os.path.join(d.getVar("LOG_DIR"), 'oeqa')
+    custom_json_result_dir = d.getVar("OEQA_JSON_RESULT_DIR")
+    if custom_json_result_dir:
+        json_result_dir = custom_json_result_dir
+    return json_result_dir
+
+def get_sdk_result_id(configuration):
+    return '%s_%s_%s_%s_%s' % (configuration['TEST_TYPE'], configuration['IMAGE_BASENAME'], configuration['SDKMACHINE'], configuration['MACHINE'], configuration['STARTTIME'])
+
 def testsdk_main(d):
     import os
     import subprocess
@@ -23,8 +47,6 @@ def testsdk_main(d):
     from bb.utils import export_proxies
     from oeqa.sdk.context import OESDKTestContext, OESDKTestContextExecutor
     from oeqa.utils import make_logger_bitbake_compatible
-
-    bb.event.enable_threadlock()
 
     pn = d.getVar("PN")
     logger = make_logger_bitbake_compatible(logging.getLogger("BitBake"))
@@ -43,6 +65,14 @@ def testsdk_main(d):
         d.expand("${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.target.manifest"))
     host_pkg_manifest = OESDKTestContextExecutor._load_manifest(
         d.expand("${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.host.manifest"))
+
+    processes = d.getVar("TESTIMAGE_NUMBER_THREADS") or d.getVar("BB_NUMBER_THREADS")
+    if processes:
+        try:
+            import testtools, subunit
+        except ImportError:
+            bb.warn("Failed to import testtools or subunit, the testcases will run serially")
+            processes = None
 
     sdk_dir = d.expand("${WORKDIR}/testimage-sdk/")
     bb.utils.remove(sdk_dir, True)
@@ -67,12 +97,17 @@ def testsdk_main(d):
             import traceback
             bb.fatal("Loading tests failed:\n%s" % traceback.format_exc())
 
-        result = tc.runTests()
+        if processes:
+            result = tc.runTests(processes=int(processes))
+        else:
+            result = tc.runTests()
 
         component = "%s %s" % (pn, OESDKTestContextExecutor.name)
         context_msg = "%s:%s" % (os.path.basename(tcname), os.path.basename(sdk_env))
-
-        result.logDetails()
+        configuration = get_sdk_configuration(d, 'sdk')
+        result.logDetails(get_sdk_json_result_dir(d),
+                          configuration,
+                          get_sdk_result_id(configuration))
         result.logSummary(component, context_msg)
 
         if not result.wasSuccessful():
@@ -98,8 +133,6 @@ def testsdkext_main(d):
     from bb.utils import export_proxies
     from oeqa.utils import avoid_paths_in_environ, make_logger_bitbake_compatible, subprocesstweak
     from oeqa.sdkext.context import OESDKExtTestContext, OESDKExtTestContextExecutor
-
-    bb.event.enable_threadlock()
 
     pn = d.getVar("PN")
     logger = make_logger_bitbake_compatible(logging.getLogger("BitBake"))
@@ -157,6 +190,7 @@ def testsdkext_main(d):
             f.write('SSTATE_MIRRORS += " \\n file://.* file://%s/PATH"\n' % test_data.get('SSTATE_DIR'))
             f.write('SOURCE_MIRROR_URL = "file://%s"\n' % test_data.get('DL_DIR'))
             f.write('INHERIT += "own-mirrors"\n')
+            f.write('PREMIRRORS_prepend = " git://git.yoctoproject.org/.* git://%s/git2/git.yoctoproject.org.BASENAME \\n "\n' % test_data.get('DL_DIR'))
 
         # We need to do this in case we have a minimal SDK
         subprocess.check_output(". %s > /dev/null; devtool sdk-install meta-extsdk-toolchain" % \
@@ -176,8 +210,10 @@ def testsdkext_main(d):
 
         component = "%s %s" % (pn, OESDKExtTestContextExecutor.name)
         context_msg = "%s:%s" % (os.path.basename(tcname), os.path.basename(sdk_env))
-
-        result.logDetails()
+        configuration = get_sdk_configuration(d, 'sdkext')
+        result.logDetails(get_sdk_json_result_dir(d),
+                          configuration,
+                          get_sdk_result_id(configuration))
         result.logSummary(component, context_msg)
 
         if not result.wasSuccessful():
@@ -194,3 +230,8 @@ python do_testsdkext() {
 addtask testsdkext
 do_testsdkext[nostamp] = "1"
 
+python () {
+    if oe.types.boolean(d.getVar("TESTIMAGE_AUTO") or "False"):
+        bb.build.addtask("testsdk", None, "do_populate_sdk", d)
+        bb.build.addtask("testsdkext", None, "do_populate_sdk_ext", d)
+}

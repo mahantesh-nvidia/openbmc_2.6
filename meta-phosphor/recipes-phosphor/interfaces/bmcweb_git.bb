@@ -6,6 +6,8 @@ USERADD_PACKAGES = "${PN}"
 # add a user called httpd for the server to assume
 USERADD_PARAM_${PN} = "-r -s /usr/sbin/nologin bmcweb"
 GROUPADD_PARAM_${PN} = "web; redfish"
+# Add root user to web & redfish group
+GROUPMEMS_PARAM_${PN} = "-g web -a root; -g redfish -a root"
 
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENCE;md5=a6a4edad4aed50f39a66d098d74b265b"
@@ -13,7 +15,7 @@ LIC_FILES_CHKSUM = "file://LICENCE;md5=a6a4edad4aed50f39a66d098d74b265b"
 SRC_URI = "git://github.com/openbmc/bmcweb.git"
 
 PV = "1.0+git${SRCPV}"
-SRCREV = "162be7b8b816ff34d08b8d5db461de067356b4d9"
+SRCREV = "4ae611d9de1504b68f521e9837ddb97e0dc89d27"
 
 S = "${WORKDIR}/git"
 

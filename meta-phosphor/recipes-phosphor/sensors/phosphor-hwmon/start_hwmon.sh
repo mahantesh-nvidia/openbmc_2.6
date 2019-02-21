@@ -18,5 +18,6 @@ then
 fi
 
 path="${path//:/--}"
+path="${path//-/\\x2d}"
 
 systemctl $action 'xyz.openbmc_project.Hwmon@'$path'.service'

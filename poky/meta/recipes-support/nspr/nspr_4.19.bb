@@ -11,6 +11,9 @@ SRC_URI = "http://ftp.mozilla.org/pub/nspr/releases/v${PV}/src/nspr-${PV}.tar.gz
            file://remove-srcdir-from-configure-in.patch \
            file://0002-Add-nios2-support.patch \
            file://0001-md-Fix-build-with-musl.patch \
+           file://0003-Add-type-definitions-for-the-RISC-V-architecture.patch \
+           file://0004-Add-ARC-support.patch \
+           file://Makefile.in-remove-_BUILD_STRING-and-_BUILD_TIME.patch \
            file://nspr.pc.in \
 "
 
@@ -148,7 +151,9 @@ TESTS = " \
     xnotify \
     zerolen"
 
-inherit autotools
+inherit autotools multilib_script
+
+MULTILIB_SCRIPTS = "${PN}-dev:${bindir}/nspr-config"
 
 PACKAGECONFIG ??= "${@bb.utils.filter('DISTRO_FEATURES', 'ipv6', d)}"
 PACKAGECONFIG[ipv6] = "--enable-ipv6,--disable-ipv6,"

@@ -24,7 +24,7 @@ from oeqa.core.decorator import decoratorClasses, OETestDecorator, \
 # Generate the function definition because this differ across python versions
 # Python >= 3.4.4 uses tree parameters instead four but for example Python 3.5.3
 # ueses four parameters so isn't incremental.
-_failed_test_args = inspect.getargspec(unittest.loader._make_failed_test).args
+_failed_test_args = inspect.getfullargspec(unittest.loader._make_failed_test).args
 exec("""def _make_failed_test(%s): raise exception""" % ', '.join(_failed_test_args))
 unittest.loader._make_failed_test = _make_failed_test
 
@@ -44,6 +44,8 @@ def _built_modules_dict(modules):
         # Assumption: package and module names do not contain upper case
         # characters, whereas class names do
         m = re.match(r'^(\w+)(?:\.(\w[^.]*)(?:\.([^.]+))?)?$', module, flags=re.ASCII)
+        if not m:
+            continue
 
         module_name, class_name, test_name = m.groups()
 

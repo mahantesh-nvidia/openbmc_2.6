@@ -56,6 +56,8 @@ inherit useradd
 USERADD_PACKAGES = "${PN}"
 # add ipmi group
 GROUPADD_PARAM_${PN} = "ipmi"
+# Add root user to ipmi group
+GROUPMEMS_PARAM_${PN} = "-g ipmi -a root"
 
 SYSTEMD_SERVICE_${PN} += "xyz.openbmc_project.Ipmi.Internal.SoftPowerOff.service phosphor-ipmi-host.service"
 
@@ -84,8 +86,10 @@ SRC_URI += "file://merge_yamls.py "
 
 HOSTIPMI_PROVIDER_LIBRARY += "libipmi20.so"
 HOSTIPMI_PROVIDER_LIBRARY += "libsysintfcmds.so"
+HOSTIPMI_PROVIDER_LIBRARY += "libusercmds.so"
 
 NETIPMI_PROVIDER_LIBRARY += "libipmi20.so"
+NETIPMI_PROVIDER_LIBRARY += "libusercmds.so"
 
 FILES_${PN}_append = " ${libdir}/host-ipmid/lib*${SOLIBS}"
 FILES_${PN}_append = " ${libdir}/ipmid-providers/lib*${SOLIBS}"
