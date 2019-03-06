@@ -145,7 +145,7 @@ case ${BOOT_OPT} in
 esac
 
 # Set PATH so we can use 'mkimage' to generate the script
-PATH=$PATH:/auto/sw_soc_dev/tools/gcc/bmc-gcc-7.3.0/bin/arm-openbmc-linux-gnueabi
+PATH=$PATH:/auto/sw_soc_dev/tools/gcc/bmc-gcc-8.2.0/bin/arm-openbmc-linux-gnueabi
 
 # Get the script image filename
 UBOOT_SCRIPT_IMG=${BOOT_DIR}/$(basename ${TFTP_UBOOT_ENV})

@@ -46,7 +46,7 @@ mkdir -p ${KBUILD_DIR}
 echo "BMC Linux kernel build started, $(date)" > ${LOG}
 
 # Configure PATH
-PATH=${PATH}:/auto/sw_soc_dev/tools/gcc/bmc-gcc-7.3.0/bin/arm-openbmc-linux-gnueabi
+PATH=${PATH}:/auto/sw_soc_dev/tools/gcc/bmc-gcc-8.2.0/bin/arm-openbmc-linux-gnueabi
 
 # Go into the linux directory and the script will put us
 # in a build subdirectory.
