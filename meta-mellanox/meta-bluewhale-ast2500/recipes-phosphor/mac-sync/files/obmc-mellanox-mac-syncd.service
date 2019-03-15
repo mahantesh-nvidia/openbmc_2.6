@@ -1,0 +1,8 @@
+[Unit]
+Description=Mellanox MAC Sync Daemon
+
+[Service]
+ExecStart={sbindir}/obmc-mellanox-mac-syncd.sh
+
+[Install]
+WantedBy={SYSTEMD_DEFAULT_TARGET}

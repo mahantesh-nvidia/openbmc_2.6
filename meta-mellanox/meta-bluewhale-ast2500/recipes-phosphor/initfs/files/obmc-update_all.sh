@@ -15,7 +15,7 @@
 #    /dev/mtd5 is a JFFS2 filesystem (rwfs) partition
 #
 
-version="01/04/2019"
+version="03/18/2019"
 echo $0: script version $version
 
 if [ -z $1 ]
@@ -167,6 +167,9 @@ if [ $MAC1 == "ff:ff:ff:ff:ff:ff" ]; then
 else
     /sbin/fw_setenv eth1addr $MAC1
 fi
+
+# Manually call "MAC sync" script before rebooting
+/usr/sbin/obmc-mellanox-mac-syncd.sh
 
 echo $0: Rebooting BMC
 
