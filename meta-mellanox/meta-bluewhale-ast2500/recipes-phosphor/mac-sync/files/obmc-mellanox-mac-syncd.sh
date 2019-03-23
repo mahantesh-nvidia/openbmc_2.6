@@ -26,14 +26,14 @@ if [ $FLASH_CP == 2 ]; then
 fi
 
 # Read first MAC address from primary U-Boot env
-primary_ethaddr=`fw_printenv ethaddr`
+primary_ethaddr=`/sbin/fw_printenv ethaddr`
 if [ $? -ne 0 ] ; then
     echo Error reading ethaddr value from primary flash
     exit 1
 fi
 
 # Read second MAC address from primary U-Boot env
-primary_eth1addr=`fw_printenv eth1addr`
+primary_eth1addr=`/sbin/fw_printenv eth1addr`
 if [ $? -ne 0 ] ; then
     echo Error reading eth1addr value from primary flash
     exit 1
@@ -43,8 +43,8 @@ primary_mac=`echo $primary_ethaddr | cut -d "=" -f 2`
 primary_mac1=`echo $primary_eth1addr | cut -d "=" -f 2`
 
 # Read both MAC addresses from backup U-Boot env
-backup_ethaddr=`fw_printenv -c /etc/alt_fw_env.config ethaddr`
-backup_eth1addr=`fw_printenv -c /etc/alt_fw_env.config eth1addr`
+backup_ethaddr=`/sbin/fw_printenv -c /etc/alt_fw_env.config ethaddr`
+backup_eth1addr=`/sbin/fw_printenv -c /etc/alt_fw_env.config eth1addr`
 
 # No need to check for fw_printenv errors, if it fails the
 # value returned will be empty and will trigger sync anyway
@@ -56,14 +56,14 @@ backup_mac1=`echo $backup_eth1addr | cut -d "=" -f 2`
 # from primary 'ethaddr', then set it in backup flash
 if [ -z $backup_mac ] || [ $primary_mac != $backup_mac ]; then
     echo Primary ethaddr $primary_mac Backup ethaddr $backup_mac, will sync
-    fw_setenv -c /etc/alt_fw_env.config ethaddr $primary_mac
+    /sbin/fw_setenv -c /etc/alt_fw_env.config ethaddr $primary_mac
 fi
 
 # If backup 'eth1addr' does not exist or is different
 # from primary 'eth1addr', then set it in backup flash
 if [ -z $backup_mac1 ] || [ $primary_mac1 != $backup_mac1 ]; then
     echo Primary eth1addr $primary_mac1 Backup eth1addr $backup_mac1, will sync
-    fw_setenv -c /etc/alt_fw_env.config eth1addr $primary_mac1
+    /sbin/fw_setenv -c /etc/alt_fw_env.config eth1addr $primary_mac1
 fi
 
 # Exit successfully
