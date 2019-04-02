@@ -6,6 +6,7 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " tcpdump \
                                     ipmitool \
                                     mlx-ipmid \
                                     obmc-mellanox-fand \
+                                    obmc-mellanox-ipmbd \
                                     bridge-utils \
                                     strace \
                                     obmc-mellanox-mac-syncd \
