@@ -1,15 +1,26 @@
+diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
+--- a/cmdlang/Makefile.am	2019-03-28 11:04:30.607379000 -0400
++++ b/cmdlang/Makefile.am	2019-04-05 09:31:30.469097000 -0400
+@@ -15,8 +15,7 @@
+ libOpenIPMIcmdlang_la_LIBADD = -lm \
+ 	$(top_builddir)/utils/libOpenIPMIutils.la \
+ 	$(top_builddir)/lib/libOpenIPMI.la
+-libOpenIPMIcmdlang_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION) \
+-	-L$(libdir)
++libOpenIPMIcmdlang_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION)
+ 
+ bin_PROGRAMS = openipmish
+ 
 diff -ruN a/configure.ac b/configure.ac
---- a/configure.ac	2018-10-31 14:35:53.068438000 -0400
-+++ b/configure.ac	2018-10-31 14:40:16.475092000 -0400
-@@ -286,6 +286,17 @@
+--- a/configure.ac	2019-03-05 19:23:23.000000000 -0500
++++ b/configure.ac	2019-04-05 10:41:49.816871000 -0400
+@@ -267,6 +267,15 @@
  )
- AC_SUBST([MELLANOX_DIR])
+ AC_SUBST([MARVELL_BMC_DIR])
  
 +MLXBW_DIR=
 +AC_ARG_WITH(mlxbw,
 +[  --with-mlxbw            Enable the Mellanox Bluewhale BMC.],
-+    AC_DEFINE(MLX_IPMID, 1, [define to 1])
-+    AM_CONDITIONAL([MLX_IPMID],[true])
 +    AC_DEFINE(MLX_BW_IPMID, 1, [define to 1])
 +    AM_CONDITIONAL([MLX_BW_IPMID],[true])
 +    MLXBW_DIR=mlxbw
@@ -19,483 +30,474 @@ diff -ruN a/configure.ac b/configure.ac
  AM_PROG_CC_C_O
  AC_PROG_LIBTOOL
  AC_STDC_HEADERS
-@@ -936,6 +947,7 @@
+@@ -789,6 +798,7 @@
+ 	  lanserv/OpenIPMI/Makefile
  	  lanserv/sdrcomp/Makefile
  	  lanserv/marvell-bmc/Makefile
- 	  lanserv/mellanox/Makefile
-+	  lanserv/mlxbw/Makefile
++          lanserv/mlxbw/Makefile
  	  sample/Makefile
  	  doc/Makefile
  	  man/Makefile
+diff -ruN a/include/OpenIPMI/ipmi_mlx.h b/include/OpenIPMI/ipmi_mlx.h
+--- a/include/OpenIPMI/ipmi_mlx.h	1969-12-31 19:00:00.000000000 -0500
++++ b/include/OpenIPMI/ipmi_mlx.h	2019-04-05 10:09:38.074943000 -0400
+@@ -0,0 +1,19 @@
++/*
++ * ipmi_mlx.h
++ */
++
++#ifndef _IPMI_MLX_H
++#define _IPMI_MLX_H
++
++#include <OpenIPMI/mcserv.h>
++
++#define MLX_EVENT_TO_SEL_BUF_SIZE           13
++#define MLX_EVENT_DIRECTION_SHIFT           7
++
++void mlx_add_event_to_sel(lmc_data_t    *mc,
++                          unsigned char sensor_type,
++                          unsigned char sensor_num,
++                          unsigned char direction,
++                          unsigned char event_type,
++                          unsigned char offset);
++#endif /* _IPMI_MLX_H */
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
---- a/lanserv/bmc_app.c	2018-10-31 14:35:53.075437000 -0400
-+++ b/lanserv/bmc_app.c	2018-10-31 14:32:51.981117000 -0400
-@@ -46,7 +46,7 @@
+--- a/lanserv/bmc_app.c	2017-09-18 20:27:17.000000000 -0400
++++ b/lanserv/bmc_app.c	2019-04-05 10:53:23.765836000 -0400
+@@ -58,6 +58,13 @@
+ #include <OpenIPMI/ipmi_mc.h>
+ #include <OpenIPMI/ipmi_lan.h>
  
- #ifdef MLX_IPMID
- #include <OpenIPMI/ipmi_mlx.h>
--#endif
-+#endif /* ifdef MLX_IPMID */
- 
++#include <config.h>
++#include <stdlib.h>
++
++#ifdef MLX_BW_IPMID
++#include <OpenIPMI/ipmi_mlx.h>
++#endif /* ifdef MLX_BW_IPMID */
++
  static void
  handle_get_device_id(lmc_data_t    *mc,
-@@ -196,7 +196,7 @@
- 
-     mc_new_event(dest_mc, 0x02, data);
+ 		     msg_t         *msg,
+@@ -178,6 +185,36 @@
+     *rdata_len = 7;
  }
--#endif
-+#endif /* ifdef MLX_IPMID */
  
++#ifdef MLX_BW_IPMID
++void
++mlx_add_event_to_sel(lmc_data_t    *mc,
++           unsigned char sensor_type,
++           unsigned char sensor_num,
++           unsigned char direction,
++           unsigned char event_type,
++           unsigned char offset)
++{
++    lmc_data_t    *dest_mc;
++    unsigned char data[MLX_EVENT_TO_SEL_BUF_SIZE];
++    int           rv;
++
++    rv = ipmi_emu_get_mc_by_addr(mc->emu, mc->event_receiver, &dest_mc);
++    if (rv)
++        return;
++
++    memset(data, 0, MLX_EVENT_TO_SEL_BUF_SIZE);
++
++    data[4] = mc->ipmb;
++    data[6] = 0x04; /* Event message revision for IPMI 1.5. */
++    data[7] = sensor_type;
++    data[8] = sensor_num;
++    data[9] = (direction << MLX_EVENT_DIRECTION_SHIFT) | event_type;
++    data[10] = offset;
++
++    mc_new_event(dest_mc, 0x02, data);
++}
++#endif /* ifdef MLX_BW_IPMID */
++
  void
  watchdog_timeout(void *cb_data)
-@@ -214,7 +214,7 @@
+ {
+@@ -188,11 +225,13 @@
+     if (!mc->watchdog_running)
+ 	goto out;
+ 
++#ifndef MLX_BW_IPMID
+     if( !sens ) {
+ 	// NOTE(noelbk): The watchdog sensor should have been defined
  	// earlier, but don't SEGFAULT if it isn't
  	goto out;
      }
--#endif
-+#endif /* ifndef MLX_IPMID */
++#endif /* ifndef MLX_BW_IPMID */
  
      if (! mc->watchdog_preaction_ran) {
  	struct timeval tv, now;
-@@ -254,7 +254,7 @@
+@@ -231,6 +270,7 @@
+  do_full_expiry:
      mc->watchdog_running = 0; /* Stop the watchdog on a timeout */
      mc->watchdog_expired |= (1 << IPMI_MC_WATCHDOG_GET_USE(mc));
- 
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-     unsigned char status_led_run_str[32];
-     system("echo 1 > /bsp/leds/status/red/brightness");
-     system("echo 0 > /bsp/leds/status/green/brightness");
-@@ -265,32 +265,32 @@
- 
-     /* set "IERR" if IPMI watchdog timeout expired */
-     system("echo 1 > /bsp/environment/cpu_status");
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 
++
      switch (IPMI_MC_WATCHDOG_GET_ACTION(mc)) {
      case IPMI_MC_WATCHDOG_ACTION_NONE:
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-         /*Uart to BMC*/
-         system("echo 0 > /bsp/reset/uart_sel");
-         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x6);
- #else
  	set_sensor_bit(mc, sens, 0, 1, 0xc0, mc->watchdog_use & 0xf, 0xff, 1);
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 	break;
- 
-     case IPMI_MC_WATCHDOG_ACTION_RESET:
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-         /*CPU Reset*/
-         system("echo 0 > /bsp/reset/cpu_reset_soft");
-         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x1);
- #else
- 	set_sensor_bit(mc, sens, 1, 1, 0xc1, mc->watchdog_use & 0xf, 0xff, 1);
- 	bchan->hw_op(bchan, HW_OP_RESET);
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 	break;
- 
-     case IPMI_MC_WATCHDOG_ACTION_POWER_DOWN:
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-         /*CPU Power-off*/
-         system("echo 0 > /bsp/reset/cpu_reset_hard");
-         mlx_add_event_to_sel(mc, IPMI_SENSOR_TYPE_WATCHDOG_1, 0 , 0, IPMI_EVENT_READING_TYPE_SENSOR_SPECIFIC, 0x3);
-@@ -299,11 +299,11 @@
- 	bchan->hw_op(bchan, HW_OP_POWEROFF);
- 	if (bchan->stop_cmd)
- 	    bchan->stop_cmd(bchan, 0);
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 	break;
- 
-     case IPMI_MC_WATCHDOG_ACTION_POWER_CYCLE:
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-         /*CPU power cycle*/
-         system("echo 0 > /bsp/reset/cpu_reset_hard");
-         sleep(3);
-@@ -315,7 +315,7 @@
- 	if (bchan->stop_cmd)
- 	    bchan->stop_cmd(bchan, 0);
- 	start_poweron_timer(mc);
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 	break;
-     }
- 
-@@ -333,7 +333,7 @@
+@@ -265,12 +305,13 @@
+ do_watchdog_reset(lmc_data_t *mc)
+ {
+     struct timeval tv;
+-
++#ifndef MLX_BW_IPMID
+     if (IPMI_MC_WATCHDOG_GET_ACTION(mc) ==
+ 	IPMI_MC_WATCHDOG_ACTION_NONE) {
  	mc->watchdog_running = 0;
  	return;
      }
--#endif
-+#endif /* ifndef  MLX_IPMID */
++#endif /* ifndef  MLX_BW_IPMID */
      mc->watchdog_preaction_ran = 0;
  
      /* Timeout is in tenths of a second, offset is in seconds */
-@@ -348,7 +348,7 @@
+@@ -285,7 +326,7 @@
  	    tv.tv_usec = 0;
  	}
      }
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-     unsigned char status_led_run_str[32]; 
- 
-     if (mc->watchdog_running != 1) {
-@@ -356,18 +356,19 @@
-             system(status_led_run_str);
-     }
-     mc->sysinfo->stop_timer(mc->watchdog_timer);
--#endif
 -    mc->watchdog_running = 1;
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
 +    mc->watchdog_running = 1; 
- #ifndef MLX_IPMID
      mc->sysinfo->start_timer(mc->watchdog_timer, &tv);
- #else
-     if (mc->sysinfo->start_timer(mc->watchdog_timer, &tv))
-         mc->sysinfo->log(mc->sysinfo, OS_ERROR, NULL,
-                          "Failed to reset watchdog timer");
--
-+#ifndef MLX_BW_IPMID
-     /* set "Presence detected" on IPMI watchdog start */
-     system("echo 128 > /bsp/environment/cpu_status");
--#endif
-+#endif /* ifndef MLX_BW_IPMID */
-+#endif /* ifndef MLX_IPMID */ 
  }
  
- static void
-diff -ruN a/lanserv/bmc_sensor.c b/lanserv/bmc_sensor.c
---- a/lanserv/bmc_sensor.c	2018-10-31 14:35:53.079443000 -0400
-+++ b/lanserv/bmc_sensor.c	2018-10-31 14:33:02.505901000 -0400
-@@ -49,7 +49,7 @@
- 
- #ifdef MLX_IPMID
- #include <OpenIPMI/ipmi_mlx.h>
--#endif
-+#endif /* ifdef MLX_IPMID */
- 
- static void sensor_poll(void *cb_data);
- 
-@@ -299,7 +299,7 @@
-     *rdata_len = 3;
- }
- 
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
- static void 
- status_led_control(unsigned char num,
-                    unsigned char direction,
-@@ -328,13 +328,13 @@
-         case MLX_PSU1_VIN_SENSOR_NUM:
-         case MLX_PSU2_VIN_SENSOR_NUM:
-         case MLX_A2D_1_8V_SENSOR_NUM:
--            if (sprintf(status_led_run_str,"status_led.py 0x%02x %d 0x%02x\n",num, direction, type))
-+          if (sprintf(status_led_run_str,"status_led.py 0x%02x %d 0x%02x\n",num, direction, type))
-                  system(status_led_run_str);
--            break;
-+          break;
-         default:
--            break;
-+          break;
-         }
--        break;
-+         break;
-     case IPMI_SENSOR_TYPE_CURRENT:
-         switch (num) {
-         case MLX_VCORE_UCD_CURR_SENSOR_NUM:
-@@ -368,8 +368,8 @@
-         break;
-     }
- }
--#endif
--
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
-+   
- static void
- do_event(lmc_data_t    *mc,
- 	 sensor_t      *sensor,
-@@ -409,9 +409,9 @@
-     data[11] = byte2;
-     data[12] = byte3;
- 
--#ifdef MLX_IPMID
--    status_led_control(sensor->num, direction, sensor->sensor_type);
--#endif
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-+    status_led_control(sensor->num, direction, sensor->sensor_type); 
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 
-     mc_new_event(dest_mc, 0x02, data);
- }
-@@ -1585,10 +1585,14 @@
- 	int err;
- 
- 	err = sensor->poll(sensor->cb_data, &val, &errstr);
-+
- 	if (err) {
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)
-             if (sensor->enabled) {
--                status_led_control(sensor->num, 0, sensor->sensor_type);
-+#if !defined(MLX_BW_IPMID)
-+             status_led_control(sensor->num, 0, sensor->sensor_type);
-+#endif /* !defined(MLX_BW_IPMID) */
-+
-                 sensor->enabled = 0;
-                 /* In case PSU1 or PSU2 is power-off/plugged-out add msg to the SEL */
-                 switch (sensor->num) {
-@@ -1636,7 +1640,7 @@
-                 default:
-                     break;
-                 }
--            }
-+        }
-             goto out_restart;
- #else
- 	    mc->sysinfo->log(mc->sysinfo, OS_ERROR, NULL,
-@@ -1646,10 +1650,10 @@
- #endif /* MLX_IPMID */
- 	    goto out_restart;
- 	}
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-         else{
-             if (!sensor->enabled) {
--                status_led_control(sensor->num, 1, sensor->sensor_type);
-+              status_led_control(sensor->num, 1, sensor->sensor_type);
-                 sensor->enabled = 1;
-                 switch (sensor->num) {
-                 /* In case PSU1 or PSU2 is power-on add msg to the SEL */
-@@ -1673,7 +1677,7 @@
-                 }
-             }
-         }
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 	
- 	if (sensor->event_reading_code == IPMI_EVENT_READING_TYPE_THRESHOLD) {
- 	    if (val < 0)
-diff -ruN a/lanserv/bmc_storage.c b/lanserv/bmc_storage.c
---- a/lanserv/bmc_storage.c	2018-10-31 14:35:53.083453000 -0400
-+++ b/lanserv/bmc_storage.c	2018-10-31 14:33:14.846650000 -0400
-@@ -280,13 +280,13 @@
- 	    chan->set_atn(chan, 1, IPMI_MC_EVBUF_FULL_INT_ENABLED(mc));
-     }
- 
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
-     if (mc->pef.pef_control & 0x1)
-         mlx_mc_pef_apply(mc, record_type, event);
--#endif /* MLX_IPMID */
-+#endif /*  defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- }
- 
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
- void mlx_mc_pef_apply(lmc_data_t    *mc,
-                         unsigned char record_type,
-                         unsigned char event[13])
-@@ -319,21 +319,21 @@
- 
-         if ((mc->pef.event_filter_table[i][2] & 0x10)
-             && (mc->pef.pef_action_global_control & 0x10)) /* OEM */
--            system("echo 3 > /bsp/leds/status/amber/trigger");
-+          system("echo 3 > /bsp/leds/status/amber/trigger");
- 
-         if ((mc->pef.event_filter_table[i][2] & 0x2)
-             && (mc->pef.pef_action_global_control & 0x2))  /* Power-off */
--            system("echo 0 > /bsp/reset/cpu_reset_hard");
-+          system("echo 0 > /bsp/reset/cpu_reset_hard");
- 
-         if ((mc->pef.event_filter_table[i][2] & 0x4)
-             && (mc->pef.pef_action_global_control & 0x4))  /* Reset */
--            system("echo 0 > /bsp/reset/cpu_reset_soft");
-+          system("echo 0 > /bsp/reset/cpu_reset_soft");
- 
-         if ((mc->pef.event_filter_table[i][2] & 0x8)
-             && (mc->pef.pef_action_global_control & 0x8)) { /* Power cycle */
--            system("echo 0 > /bsp/reset/cpu_reset_hard");
--            sleep(3);
--            system("echo 1 > /bsp/reset/cpu_reset_hard");
-+          system("echo 0 > /bsp/reset/cpu_reset_hard");
-+          sleep(3);
-+          system("echo 1 > /bsp/reset/cpu_reset_hard");
-         }
- 
-         if ((mc->pef.event_filter_table[i][2] & 0x20)
-@@ -356,7 +356,7 @@
-             continue;
-     }
- }
--#endif /* MLX_IPMID */
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
- 
- static void
- handle_get_sel_info(lmc_data_t    *mc,
-@@ -1800,7 +1800,7 @@
- 	    *rdata_len = 1;
- 	    goto out_unlock;
- 	}
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
- #define MLX_FRU_HEADER_VERSION               0x1
- #define MLX_FRU_HEADER_PRODUCT               0x1
- #define MLX_FRU_PRODUCT_MANUFACTURER_LEN     0xc4 // &3f = 4
-@@ -1902,7 +1902,7 @@
-             rdata[19] = MLX_FRU_NO_PRODUCT_EXTRA_INFO;
-         }
-     }
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
-     } else {
- 	memcpy(rdata + 2, data + offset, count);
-     }
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
---- a/lanserv/ipmi_sim.c	2018-10-31 14:35:53.087445000 -0400
-+++ b/lanserv/ipmi_sim.c	2018-10-31 14:33:34.602255000 -0400
-@@ -92,7 +92,7 @@
+--- a/lanserv/ipmi_sim.c	2018-12-20 15:14:45.000000000 -0500
++++ b/lanserv/ipmi_sim.c	2019-04-05 10:52:42.063681000 -0400
+@@ -90,14 +90,22 @@
+ #include <OpenIPMI/serv.h>
+ #include <OpenIPMI/lanserv.h>
  #include <OpenIPMI/serserv.h>
- #ifdef MLX_IPMID
- #include <OpenIPMI/ipmi_types.h>
--#endif
-+#endif /* ifdef MLX_IPMID */
+-
++#ifdef MLX_BW_IPMID
++#include <OpenIPMI/ipmi_types.h>
++#endif /* ifdef MLX_BW_IPMID */
  #include "emu.h"
  #include <OpenIPMI/persist.h>
  
-@@ -101,10 +101,15 @@
+ #define MAX_ADDR 4
+ 
  #define BASE_CONF_STR SYSCONFDIR "/ipmi"
- #ifdef MLX_IPMID
- #define MLNX_CONF_FILE_EXT       ".hw"
-+#ifndef MLX_BW_IPMID
- static char *config_file = BASE_CONF_STR "/mellanox.lan.conf";
- #else
++#ifdef MLX_BW_IPMID
++#define MLNX_CONF_FILE_EXT       ".hw"
 +static char *config_file = BASE_CONF_STR "/mlxbw.lan.conf";
-+#endif /* ifndef MLX_BW_IPMID */
 +#else
  static char *config_file = BASE_CONF_STR "/lan.conf";
--#endif
-+#endif  /* ifdef MLX_IPMID */
++#endif  /* ifdef MLX_BW_IPMID */
 +
  static const char *statedir = STATEDIR;
  static char *command_string = NULL;
  static char *command_file = NULL;
-@@ -340,7 +345,7 @@
-     }
-     return ipmi_fd;
+@@ -308,6 +316,31 @@
+     return;
  }
--#endif
-+#endif /* MLX_IPMID */
  
++#ifdef MLX_BW_IPMID
++static int
++ipmi_open(char *ipmi_dev)
++{
++    int ipmi_fd;
++
++    if (ipmi_dev) {
++	ipmi_fd = open(ipmi_dev, O_RDWR);
++    } else {
++	ipmi_fd = open("/dev/ipmidev/0", O_RDWR);
++	if (ipmi_fd == -1) {
++	    ipmi_fd = open("/dev/ipmi0", O_RDWR);
++	}
++	if (ipmi_fd == -1) {
++	    ipmi_fd = open("/dev/ipmi-bt-host", O_RDWR);
++	}
++    }
++
++    if (ipmi_fd == -1) {
++	perror("Could not open ipmi device /dev/ipmidev/0, /dev/ipmi0 or /dev/ipmi-bt-host");
++    }
++    return ipmi_fd;
++}
++#endif /* MLX_BW_IPMID */
++
  static int
  open_lan_fd(struct sockaddr *addr, socklen_t addr_len)
-@@ -389,9 +394,10 @@
-     lan->send_out = lan_send;
-     lan->gen_rand = gen_rand;
- 
-+
-     err = ipmi_lan_init(lan);
-     if (err) {
--	fprintf(stderr, "Unable to init lan: 0x%x\n", err);
-+      fprintf(stderr, "Unable to init lan: 0x%x\n", err);
- 	exit(1);
-     }
- 
-@@ -571,7 +577,7 @@
- 
-     return 0;
- }
--#endif
-+#endif /* MLX_IPMID */
- 
- static int
- ser_channel_tmode_proto_init(void *info, channel_t *chan)
-@@ -673,11 +679,11 @@
  {
+@@ -475,96 +508,15 @@
+ static int
+ ser_channel_init(void *info, channel_t *chan)
+ {
+-    misc_data_t *data = info;
      serserv_data_t *ser = chan->chan_info;
-     switch(ser->channel.protocol_type) {
--#ifdef MLX_IPMID
-+#if defined (MLX_IPMID) && !defined (MLX_BW_IPMID)
-         case IPMI_CHANNEL_PROTOCOL_BT_v15:
-             return ser_channel_bt_proto_init(info, chan);
-             break;
--#endif
-+#endif /* defined (MLX_IPMID) && !defined (MLX_BW_IPMID) */
-         case IPMI_CHANNEL_PROTOCOL_TMODE:
-             return ser_channel_tmode_proto_init(info, chan);
-             break;
-@@ -1604,8 +1610,10 @@
+-    int err;
+-    int fd;
+-    struct sockaddr *addr = &ser->addr.addr.s_ipsock.s_addr0;
+-    os_hnd_fd_id_t *fd_id;
+-    int val;
+-
+-    ser->os_hnd = data->os_hnd;
+-    ser->user_info = data;
+-    ser->send_out = ser_send;
+-
+-    err = serserv_init(ser);
+-    if (err) {
+-	fprintf(stderr, "Unable to init serial: 0x%x\n", err);
+-	exit(1);
+-    }
+-
+-    fd = socket(addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
+-    if (fd == -1) {
+-	perror("Unable to create socket");
+-	exit(1);
+-    }
+-
+-    if (ser->do_connect) {
+-	err = connect(fd, addr, ser->addr.addr_len);
+-	if (err == -1) {
+-	    fprintf(stderr, "Unable to connect to serial TCP port: %s\n",
+-		    strerror(errno));
+-	    exit(1);
+-	}
+-	ser->con_fd = fd;
+-	ser->bind_fd = -1;
+-
+-	err = data->os_hnd->add_fd_to_wait_for(data->os_hnd, ser->con_fd,
+-					       ser_data_ready, ser,
+-					       NULL, &fd_id);
+-	if (err) {
+-	    fprintf(stderr, "Unable to add serial socket wait: 0x%x\n", err);
+-	    exit(1);
+-	}
+-    } else {
+-        int opt = 1;
+-
+-	err = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+-	if (err == -1) {
+-	    fprintf(stderr, "Unable to set SO_REUSEADDR on serial TCP: %s\n",
+-		    strerror(errno));
+-	    exit(1);
+-	}
+-
+-	err = bind(fd, addr, ser->addr.addr_len);
+-	if (err == -1) {
+-	    fprintf(stderr, "Unable to bind to serial TCP port: %s\n",
+-		    strerror(errno));
+-	    exit(1);
+-	}
+-	ser->bind_fd = fd;
+-	ser->con_fd = -1;
+-
+-	err = listen(fd, 1);
+-	if (err == -1) {
+-	    fprintf(stderr, "Unable to listen to serial TCP port: %s\n",
+-		    strerror(errno));
+-	    exit(1);
+-	}
+-
+-	val = 1;
+-	err = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&val,
+-			 sizeof(val));
+-	if (err == -1) {
+-	    fprintf(stderr, "Unable to set SO_REUSEADDR on socket: %s\n",
+-		    strerror(errno));
+-	    exit(1);
+-	}
+-	
+-
+-	err = data->os_hnd->add_fd_to_wait_for(data->os_hnd, ser->bind_fd,
+-					       ser_bind_ready, ser,
+-					       NULL, &fd_id);
+-	if (err) {
+-	    fprintf(stderr, "Unable to add serial socket wait: 0x%x\n", err);
+-	    exit(1);
+-	}
+-    }
+-
+-    if (!err)
+-	isim_add_fd(fd);
+-
+-    return err;
++    switch(ser->channel.protocol_type) {
++        default:
++            return -1;
++            break;
++    }
++    fprintf(stderr, "init serial unexpected exit\n");
++    return -1;
++ 
+ }
+ 
+ static void
+@@ -1499,8 +1451,10 @@
      sysinfo.sol = ipmi_mc_get_sol(mc);
  
      if (read_config(&sysinfo, config_file, print_version))
 +    {
-+	fprintf(stderr, "read config fail\n");
++      fprintf(stderr, "read config error\n");
  	exit(1);
 -
 +    }
      if (print_version)
  	exit(0);
  
-@@ -1618,7 +1626,7 @@
-     err = persist_init("mlx_ipmid", sysinfo.name, statedir);
- #else
+@@ -1509,7 +1463,11 @@
+ 	exit(1);
+     }
+ 
++#ifdef MLX_BW_IPMID
++    err = persist_init("mlx_ipmid", sysinfo.name, statedir);
++#else
      err = persist_init("ipmi_sim", sysinfo.name, statedir);
--#endif
-+#endif /* MLX_IPMID */
++#endif /* MLX_BW_IPMID */
      if (err) {
  	fprintf(stderr, "Unable to initialize persistence: %s\n",
  		strerror(err));
-@@ -1659,7 +1667,7 @@
-         strcat(command_file, MLNX_CONF_FILE_EXT);
- #else
-         strcat(command_file, ".emu");
--#endif
-+#endif /* MLX_IPMID */
+@@ -1546,7 +1504,11 @@
+ 	strcpy(command_file, BASE_CONF_STR);
+ 	strcat(command_file, "/");
+ 	strcat(command_file, sysinfo.name);
+-	strcat(command_file, ".emu");
++#ifdef MLX_BW_IPMID
++        strcat(command_file, MLNX_CONF_FILE_EXT);
++#else
++        strcat(command_file, ".emu");
++#endif /* MLX_BW_IPMID */
  	tf = fopen(command_file, "r");
  	if (!tf) {
  	    free(command_file);
-@@ -1756,13 +1764,13 @@
- 	goto out;
-     }
+diff -ruN a/lanserv/lanserv_ipmi.c b/lanserv/lanserv_ipmi.c
+--- a/lanserv/lanserv_ipmi.c	2019-01-05 00:22:18.000000000 -0500
++++ b/lanserv/lanserv_ipmi.c	2019-04-05 09:56:08.341309000 -0400
+@@ -2864,7 +2864,7 @@
  
--#ifdef MLX_IPMID
-+#if defined(MLX_IPMID)  && !defined(MLX_BW_IPMID)
- /*Uart to CPU*/
-     system("echo 1 > /bsp/reset/uart_sel");
+ 	if (session == NULL) {
+ 	    lan->sysinfo->log(lan->sysinfo, INVALID_MSG, msg,
+-		     "Normal session message failure: Invalid SID");
++		     "Normal RMCPP session message failure: Invalid SID");
+ 	    return;
+ 	}
  
- /*CPU go*/
-     system("echo 1 > /bsp/reset/cpu_reset_hard");
--#endif
-+#endif /* defined(MLX_IPMID)  && !defined(MLX_BW_IPMID) */
+@@ -2971,7 +2971,7 @@
  
-     data.os_hnd->operation_loop(data.os_hnd);
-     rv = 0;
+ 	if (session == NULL) {
+ 	    lan->sysinfo->log(lan->sysinfo, INVALID_MSG, msg,
+-		     "Normal session message failure: Invalid SID");
++		     "Normal RMCP session message failure: Invalid SID");
+ 	    return;
+ 	}
+ 
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
---- a/lanserv/Makefile.am	2018-10-31 14:35:53.090451000 -0400
-+++ b/lanserv/Makefile.am	2018-10-31 14:33:57.725811000 -0400
+--- a/lanserv/Makefile.am	2017-08-03 09:23:57.000000000 -0400
++++ b/lanserv/Makefile.am	2019-04-05 10:42:32.331011000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
  
--SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@ @MELLANOX_DIR@
--DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc mellanox
-+SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@ @MELLANOX_DIR@ @MLXBW_DIR@
-+DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc mellanox mlxbw
+-SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@
+-DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc
++SUBDIRS = OpenIPMI sdrcomp @MARVELL_BMC_DIR@ @MLXBW_DIR@
++DIST_SUBDIRS = OpenIPMI sdrcomp marvell-bmc mlxbw
  
  AM_CFLAGS = -Wall -Wsign-compare -I$(top_srcdir)/include -DIPMI_CHECK_LOCKS \
  	$(OPENSSLINCS) -DPVERSION="\"$(PVERSION)\""
+@@ -15,19 +15,12 @@
+ AM_CPPFLAGS = -DSYSCONFDIR='"$(sysconfdir)"' -DSTATEDIR='"$(localstatedir)"'
+ 
+ lib_LTLIBRARIES = libIPMIlanserv.la
+-
+-if HAVE_OPENIPMI_SMI
+-IPMILAN_PROG = ipmilan
+-IPMILAN_MAN = ipmilan.8
+-IPMILAN_NOMAN =
++if MLX_BW_IPMID
++bin_PROGRAMS = mlx_ipmid ipmilan
+ else
+-IPMILANPROG =
+-IPMILAN_MAN =
+-IPMILAN_NOMAN = ipmilan.8
++bin_PROGRAMS = ipmi_sim ipmilan
+ endif
+ 
+-bin_PROGRAMS = ipmi_sim $(IPMILAN_PROG)
+-
+ noinst_PROGRAMS = ipmi_checksum
+ 
+ noinst_HEADERS = emu.h bmc.h
+@@ -35,48 +28,49 @@
+ libIPMIlanserv_la_SOURCES = lanserv_ipmi.c lanserv_asf.c priv_table.c \
+ 	lanserv_oem_force.c lanserv_config.c config.c serv.c serial_ipmi.c \
+ 	persist.c extcmd.c
+-libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl $(RT_LIB)
++libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl
+ libIPMIlanserv_la_LDFLAGS = -version-info $(LD_VERSION) \
++	-Wl,-Map -Wl,libIPMIlanserv.map \
+ 	../utils/libOpenIPMIutils.la
+ 
+ ipmi_checksum_SOURCES = ipmi_checksum.c
+ 
+-if HAVE_OPENIPMI_SMI
+ ipmilan_SOURCES = lanserv.c
+-ipmilan_LDADD = $(POPTLIBS) libIPMIlanserv.la -ldl $(RT_LIB)
++ipmilan_LDADD = $(POPTLIBS) libIPMIlanserv.la -ldl
+ ipmilan_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
+ 	../utils/libOpenIPMIutils.la
+-endif
++if MLX_BW_IPMID
++mlx_ipmid_SOURCES = ipmi_sim.c bmc.c emu_cmd.c sol.c \
++	bmc_storage.c bmc_app.c bmc_chassis.c bmc_transport.c \
++	bmc_sensor.c bmc_picmg.c
+ 
++mlx_ipmid_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread
++mlx_ipmid_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
++	../utils/libOpenIPMIutils.la
++else
+ ipmi_sim_SOURCES = ipmi_sim.c bmc.c emu_cmd.c sol.c \
+ 	bmc_storage.c bmc_app.c bmc_chassis.c bmc_transport.c \
+ 	bmc_sensor.c bmc_picmg.c
+-ipmi_sim_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread $(RT_LIB)
++
++ipmi_sim_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread
+ ipmi_sim_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
+-	../utils/libOpenIPMIutils.la $(SOCKETLIB)
++	../utils/libOpenIPMIutils.la
++endif
+ 
+-man_MANS = $(IPMILAN_MAN) ipmi_lan.5 ipmi_sim.1 ipmi_sim_cmd.5
++man_MANS = ipmilan.8 ipmi_lan.5 ipmi_sim.1 ipmi_sim_cmd.5
+ 
+-READMES = README.ipmi_sim README.vm README.design README.yourownbmc
+-EXTRA_DIST = atca.emu lan.conf ipmisim1.emu ipmisim1.sdrs \
+-	$(man_MANS) $(IPMILAN_NOMAN) $(READMES)
++EXTRA_DIST = atca.emu README.vm lan.conf ipmisim1.emu $(man_MANS)
+ 
++if !MLX_BW_IPMID
+ install-data-local:
+ 	$(INSTALL) -m 755 -d "$(DESTDIR)$(sysconfdir)/ipmi/"; \
+-	$(INSTALL) -m 644 $(srcdir)/lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/"; 
+-	$(INSTALL) -m 644 $(srcdir)/ipmisim1.emu "$(DESTDIR)$(sysconfdir)/ipmi/"; 
+-
+-noinst_DATA = ipmisim1.bsdr
+-
+-SUFFIXES = .bsdr .sdrs
+-.sdrs.bsdr:
+-	sdrcomp/sdrcomp_build -o $@ $<
+-
+-ipmisim1.bsdr: $(top_srcdir)/lanserv/ipmisim1.sdrs sdrcomp/sdrcomp_build
++	$(INSTALL) -m 644 $(srcdir)/lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/";
++	$(INSTALL) -m 644 $(srcdir)/ipmisim1.emu "$(DESTDIR)$(sysconfdir)/ipmi/";
+ 
+ uninstall-local:
+ 	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/lan.conf"
+ 	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/sim.emu"
+ 	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null
++endif
+ 
+-CLEANFILES = ipmisim1.bsdr
++CLEANFILES = libIPMIlanserv.map
 diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-events.rules	2018-10-31 14:27:35.086573000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-04-05 09:48:45.116241000 -0400
 @@ -0,0 +1,18 @@
 +########################################################################
-+# Copyright (c) 2018 Mellanox Technologies.
-+# Copyright (c) 2018 Diane Lynch dianel@mellanox.com>
++# Copyright (c) 2019 Mellanox Technologies.
++# Copyright (c) 2019 Diane Lynch dianel@mellanox.com>
 +#
 +# Licensed under the GNU General Public License Version 2
 +#
@@ -513,11 +515,11 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.
 +
 diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2018-10-31 14:27:35.089555000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-04-05 09:48:45.119240000 -0400
 @@ -0,0 +1,65 @@
 +########################################################################
-+# Copyright (c) 2018 Mellanox Technologies.
-+# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
++# Copyright (c) 2019 Mellanox Technologies.
++# Copyright (c) 2019 Diane Lynch <dianel@mellanox.com>
 +#
 +# Licensed under the GNU General Public License Version 2
 +#
@@ -582,7 +584,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-h
 +SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/lancontrol	2018-10-31 14:27:35.091565000 -0400
++++ b/lanserv/mlxbw/lancontrol	2019-04-05 09:48:45.122240000 -0400
 @@ -0,0 +1,295 @@
 +#!/bin/sh
 +
@@ -881,7 +883,7 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2018-10-31 14:50:46.199314000 -0400
++++ b/lanserv/mlxbw/Makefile.am	2019-04-05 09:48:45.124241000 -0400
 @@ -0,0 +1,24 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
@@ -909,8 +911,8 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2018-10-31 14:27:35.097570000 -0400
-@@ -0,0 +1,1577 @@
++++ b/lanserv/mlxbw/mlxbw.c	2019-04-10 10:49:09.691679000 -0400
+@@ -0,0 +1,683 @@
 +/*
 + * mlxbw.c
 + *
@@ -942,27 +944,15 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +#include "../bmc.h"
 +
 +static lmc_data_t *bmc_mc;
-+static unsigned char all_fans_failure = 0;
 +
 +/**************************************************************************
 + *                  Mellanox custom commands codes                        *
 + *************************************************************************/
-+/* IPMI_SENSOR_EVENT_NETFN (0x04) */
-+#define IPMI_OEM_MLX_SET_FAN_SPEED_CMD      0x30
-+#define IPMI_OEM_MLX_GET_LED_STATE_CMD      0x31
-+#define IPMI_OEM_MLX_SET_LED_STATE_CMD      0x32
-+#define IPMI_OEM_MLX_SET_LED_BLINKING_CMD   0x33
-+#define IPMI_OEM_MLX_GET_FAN_PWM_CMD        0x34
-+#define IPMI_OEM_MLX_GET_TOTAL_POWER_CMD    0x35
-+
 +/* IPMI_APP_NETFN (0x06) */
-+#define IPMI_OEM_MLX_SEL_BUFFER_SET_CMD     0x5B
-+#define IPMI_OEM_MLX_CPU_READY_EVENT_CMD    0x5c
++#define IPMI_OEM_MLX_SEL_BUFFER_SET_CMD     0x5b
 +#define IPMI_OEM_MLX_CPU_HARD_RESET_CMD     0x5e
 +#define IPMI_OEM_MLX_CPU_SOFT_RESET_CMD     0x5f
-+#define IPMI_OEM_MLX_RESET_PHY_CMD          0x60
-+#define IPMI_OEM_MLX_SET_UART_TO_BMC_CMD    0x61
-+#define IPMI_OEM_MLX_THERMAL_ALGORITHM_CMD  0x62
++
 +#define IPMI_OEM_MLX_BMC_UPTIME_GET_CMD     0x63
 +#define IPMI_OEM_MLX_LOG_TO_SEL_CMD         0x64
 +
@@ -972,58 +962,14 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +/* Set sel log size script file path */
 +#define SEL_SET_SCRIPT_NAME "sel_set_log_size.sh"
 +
-+/**  FAN FUNCTIONALITY DEFINES  **/
-+#define MLX_FAN_MAX   8
-+#define MLX_FAN_TACHO_FILE  "/bsp/fan/tacho"
-+#define MLX_FAN_PWM_FILE            "/bsp/fan/pwm"
-+#define MLX_FAN_PWM_ENABLE_FILE     "/bsp/fan/pwm_en"
-+#define MLX_PWM_MIN                 0
-+#define MLX_PWM_MAX                 9
 +
-+static const char* fan_tacho_en[MLX_FAN_MAX] =
-+{
-+    MLX_FAN_TACHO_FILE"1_en",
-+    MLX_FAN_TACHO_FILE"2_en",
-+    MLX_FAN_TACHO_FILE"3_en",
-+    MLX_FAN_TACHO_FILE"4_en",
-+    MLX_FAN_TACHO_FILE"5_en",
-+    MLX_FAN_TACHO_FILE"6_en",
-+    MLX_FAN_TACHO_FILE"7_en",
-+    MLX_FAN_TACHO_FILE"8_en"
-+};
 +
-+/**  LED FUNCTIONALITY DEFINES  **/
-+#define LED_FAN_FILE "/bsp/leds/fan/"
-+#define LED_STATUS_FILE "/bsp/leds/status/"
-+#define LED_BRIGHTNESS "brightness"
-+#define LED_TRIGGER    "trigger"
-+#define LED_DELAY_OFF  "delay_off"
-+#define LED_DELAY_ON   "delay_on"
-+#define LED_TIMER      "timer"
-+
-+#define LED_COLOR_RED    1
-+#define LED_COLOR_GREEN  2
-+#define LED_COLOR_AMBER  3
-+
-+#define MLX_LED_BLINK_OFF 0
-+#define MLX_LED_BLINK_3HZ 3
-+#define MLX_LED_BLINK_6HZ 6
 +
 +/* Reset links */
 +#define MLX_BMC_SOFT_RESET   "/bsp/reset/bmc_reset_soft"
 +#define MLX_CPU_HARD_RESET   "/bsp/reset/cpu_reset_hard"
 +#define MLX_CPU_SOFT_RESET   "/bsp/reset/cpu_reset_soft"
 +#define MLX_SYS_HARD_RESET   "/bsp/reset/system_reset_hard"
-+#define MLX_RESET_PHY        "/bsp/reset/reset_phy"
-+
-+#define MLX_UART_TO_BMC      "/bsp/reset/uart_sel"
-+
-+#define MLX_PSU_COUNT        2
-+#define MLX_PSU_PIN_FILE     "/bsp/environment/psu%i_pin"
-+
-+/* number of thermal zones */
-+#define MLX_MAX_THERMAL_ZONE 1
-+#define MLX_THERMAL_ZONE     "/bsp/thermal/thermal_zone%u/mode"
 +
 +#define MLX_UPTIME_FILE      "/proc/uptime"
 +
@@ -1059,574 +1005,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +static ipmi_timer_t *reset_monitor_timer = NULL;
 +#define MLX_RESET_MONITOR_TIMEOUT         10
 +
-+
-+/*
-+ * This timer is called periodically to monitor the FANs
-+ */
-+static ipmi_timer_t *fans_monitor_timer = NULL;
-+#define MLX_FANS_MONITOR_TIMEOUT          5
-+
-+
-+
-+static unsigned char set_fan_enable(const char* fname)
-+{
-+    FILE *f_en;
-+
-+    printf("set_fan_enabled\n");
-+    f_en = fopen(fname, "w");
-+
-+    if (!f_en) {
-+            printf("\nUnable to open %s file", fname);
-+            return IPMI_DESTINATION_UNAVAILABLE_CC;
-+    } else
-+        fprintf(f_en, "%u", 1);
-+
-+    fclose(f_en);
-+
-+    return 0;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x030  Speed (0x00-0xFF)
-+ *
-+**/
-+static void
-+handle_set_fan_speed_cmd (lmc_data_t    *mc,
-+                msg_t         *msg,
-+                unsigned char *rdata,
-+                unsigned int  *rdata_len,
-+                void          *cb_data)
-+{
-+    FILE *f_pwm;
-+    unsigned char pwm = 0;
-+
-+    printf("set fan speed cmd\n");
-+    return; 
-+
-+    pwm = msg->data[0];
-+    if (pwm > MLX_PWM_MAX) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    f_pwm = fopen(MLX_FAN_PWM_FILE, "w");
-+
-+    if (!f_pwm) {
-+            printf("\nUnable to open pwm file");
-+            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+            *rdata_len = 1;
-+            return;
-+    } else {
-+        if (IPMI_DESTINATION_UNAVAILABLE_CC == set_fan_enable(MLX_FAN_PWM_ENABLE_FILE)) {
-+            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+            *rdata_len = 1;
-+            return;
-+    } else
-+        fprintf(f_pwm, "%u", pwm);
-+    }
-+
-+    fclose(f_pwm);
-+    rdata[0] = 0;
-+    *rdata_len = 1;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x34
-+ *
-+**/
-+static void
-+handle_get_fan_pwm_cmd(lmc_data_t    *mc,
-+                       msg_t         *msg,
-+                       unsigned char *rdata,
-+                       unsigned int  *rdata_len,
-+                       void          *cb_data)
-+{
-+    unsigned char rv = 0;
-+    char line_pwm[10];
-+    int pwm;
-+    FILE *fpwm;
-+
-+    printf("get_fan_pwm\n");
-+    fpwm = fopen(MLX_FAN_PWM_FILE, "r");
-+
-+    if (!fpwm) {
-+        printf("\nUnable to open  PWM file");
-+        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+        *rdata_len = 1;
-+	return;
-+    }
-+
-+    if (0 >= fread(line_pwm, 1, sizeof(line_pwm),fpwm))
-+    {
-+        fclose(fpwm);
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+	return;
-+    }
-+
-+    pwm = strtoul(line_pwm, NULL, 0);
-+
-+    fclose(fpwm);
-+
-+    rdata[0] = 0;
-+    rdata[1] = pwm;
-+    *rdata_len = 2;
-+    return;
-+}
-+
-+static unsigned char set_led_command(unsigned char led,
-+                            unsigned char color,
-+                            unsigned char cmd)
-+{
-+    FILE *fbrightness;
-+    FILE *ftrigger;
-+    char fname[100];
-+    char cmd_trigger[100];
-+
-+    printf("set_led_cmd\n");
-+    memset(fname, 0, sizeof(fname));
-+    memset(cmd_trigger, 0, sizeof(cmd_trigger));
-+
-+    switch (color) {
-+    case LED_COLOR_RED:
-+        if (led <= sys_devices.status_led_number) {
-+            if (cmd)
-+                sprintf(cmd_trigger,"echo timer > %sred/%s\n",LED_STATUS_FILE, LED_TRIGGER);
-+
-+            sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+        }
-+        else {
-+            if (cmd)
-+                sprintf(cmd_trigger,"echo timer > %sred/%u/%s\n",LED_FAN_FILE, led - sys_devices.status_led_number, LED_TRIGGER);
-+
-+            sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
-+        }
-+        break;
-+    case LED_COLOR_GREEN:
-+        if (led <= sys_devices.status_led_number) {
-+            if (cmd)
-+                sprintf(cmd_trigger,"echo timer > %sgreen/%s\n",LED_STATUS_FILE, LED_TRIGGER);
-+
-+            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+        }
-+        else {
-+            if (cmd)
-+                sprintf(cmd_trigger,"echo timer > %sgreen/%u/%s\n",LED_FAN_FILE, led - sys_devices.status_led_number, LED_TRIGGER);
-+
-+            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
-+        }
-+        break;
-+    case LED_COLOR_AMBER:
-+        if (cmd)
-+            sprintf(cmd_trigger,"echo timer > %samber/%s\n",LED_STATUS_FILE, LED_TRIGGER);
-+
-+        sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+        break;
-+    default:
-+        break;
-+    }
-+
-+    fbrightness = fopen(fname, "w");
-+
-+    if (!fbrightness) {
-+        fclose(fbrightness);
-+        return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+    }
-+
-+    fprintf(fbrightness, "%u", cmd);
-+    // system(cmd_trigger);
-+
-+    fclose(fbrightness);
-+
-+    return 0;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x32  LedNum  Color
-+ *
-+ * LedNum:
-+ * 0x1 - status LED
-+ * 0x2 - FAN1 LED
-+ * 0x3 - FAN2 LED
-+ * 0x4 - FAN2 LED
-+ * 0x5 - FAN2 LED
-+ *
-+ * Color:
-+ * 0x1 - red 0x2 - green 0x3 - amber
-+**/
-+static void
-+handle_set_led_state(lmc_data_t    *mc,
-+                     msg_t         *msg,
-+                     unsigned char *rdata,
-+                     unsigned int  *rdata_len,
-+                     void          *cb_data)
-+{
-+    unsigned char rv = 0;
-+    unsigned char led, color;
-+
-+    printf("set_led_state\n");
-+    if (check_msg_length(msg, 2, rdata, rdata_len))
-+        return;
-+
-+    led = msg->data[0];
-+    if (led > sys_devices.status_led_number + sys_devices.fan_led_number ||
-+        led == 0) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    color = msg->data[1];
-+    if (color <  LED_COLOR_RED || color > LED_COLOR_AMBER) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    switch (color) {
-+    case LED_COLOR_AMBER:
-+        if (led > sys_devices.status_led_number) {
-+            rv = IPMI_INVALID_DATA_FIELD_CC;
-+            goto out;
-+        }
-+        rv = set_led_command(led, LED_COLOR_RED, 0);
-+        if (rv)
-+            goto out;
-+        rv = set_led_command(led, LED_COLOR_GREEN, 0);
-+        if (rv)
-+            goto out;
-+        rv = set_led_command(led, LED_COLOR_AMBER, 1);
-+        if (rv)
-+            goto out;
-+        break;
-+    case LED_COLOR_RED:
-+        if (led <= sys_devices.status_led_number){
-+            rv = set_led_command(led, LED_COLOR_AMBER, 0);
-+            if (rv)
-+                goto out;
-+        }
-+        rv = set_led_command(led, LED_COLOR_GREEN, 0);
-+        if (rv)
-+            goto out;
-+        rv = set_led_command(led, LED_COLOR_RED, 1);
-+        if (rv)
-+            goto out;
-+        break;
-+    case LED_COLOR_GREEN:
-+        if (led <= sys_devices.status_led_number) {
-+            rv = set_led_command(led, LED_COLOR_AMBER, 0);
-+            if (rv)
-+                goto out;
-+        }
-+        rv = set_led_command(led, LED_COLOR_RED, 0);
-+        if (rv)
-+            goto out;
-+        rv = set_led_command(led, LED_COLOR_GREEN, 1);
-+        if (rv)
-+            goto out;
-+        break;
-+    default:
-+        break;
-+    }
-+
-+ out:
-+    rdata[0] = rv;
-+    *rdata_len = 1;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x33  LedNum  Color Time
-+ *
-+ * LedNum:
-+ * 0x1 - status LED
-+ * 0x2 - FAN1 LED
-+ * 0x3 - FAN2 LED
-+ * 0x4 - FAN2 LED
-+ * 0x5 - FAN2 LED
-+ *
-+ * Color:
-+ * 0x1 - red
-+ * 0x2 - green
-+ * 0x3 - amber 
-+ *
-+ * Time: 
-+ * 0x0 - off blinking
-+ * 0x3 - blinking 3HZ
-+ * 0x6 - blinking 6HZ 
-+ *
-+ *  */ 
-+static void
-+handle_set_led_blinking (lmc_data_t    *mc,
-+                msg_t         *msg,
-+                unsigned char *rdata,
-+                unsigned int  *rdata_len,
-+                void          *cb_data)
-+{
-+    unsigned char led;
-+    unsigned char time;
-+    unsigned char color;
-+    FILE *f_delayon;
-+    FILE *f_delayoff;
-+    char fname[100];
-+
-+    printf("set_led blink\n");
-+    if (check_msg_length(msg, 3, rdata, rdata_len))
-+        return;
-+
-+    led = msg->data[0];
-+    color = msg->data[1];
-+    time = msg->data[2];
-+    if (led == 0 ||
-+        led > sys_devices.status_led_number + sys_devices.fan_led_number || 
-+        color > LED_COLOR_AMBER ||
-+        color < LED_COLOR_RED ||
-+        (time != MLX_LED_BLINK_OFF && 
-+         time != MLX_LED_BLINK_3HZ && 
-+         time != MLX_LED_BLINK_6HZ)) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    if (led <= sys_devices.status_led_number) {
-+        switch (color) {
-+        case LED_COLOR_RED:
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_DELAY_OFF);
-+            f_delayoff = fopen(fname, "w");
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sred/%s", LED_STATUS_FILE,LED_DELAY_ON);
-+            f_delayon = fopen(fname, "w");
-+            break;
-+        case LED_COLOR_GREEN:
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_DELAY_OFF);
-+            f_delayoff = fopen(fname, "w");
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sgreen/%s", LED_STATUS_FILE,LED_DELAY_ON);
-+            f_delayon = fopen(fname, "w");
-+            break;
-+        case LED_COLOR_AMBER:
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_DELAY_OFF);
-+            f_delayoff = fopen(fname, "w");
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%samber/%s", LED_STATUS_FILE,LED_DELAY_ON);
-+            f_delayon = fopen(fname, "w");
-+            break;
-+        default:
-+            break;
-+        }
-+    }
-+    else if (led > sys_devices.status_led_number && 
-+             led < sys_devices.status_led_number + sys_devices.fan_led_number) {
-+        switch (color) {
-+        case LED_COLOR_RED:
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_DELAY_OFF);
-+            f_delayoff = fopen(fname, "w");
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sred/%s", LED_FAN_FILE, led - sys_devices.status_led_number,LED_DELAY_ON);
-+            f_delayon = fopen(fname, "w");
-+            break;
-+        case LED_COLOR_GREEN:
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_DELAY_OFF);
-+            f_delayoff = fopen(fname, "w");
-+            memset(fname, 0, sizeof(fname));
-+            sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number,LED_DELAY_ON);
-+            f_delayon = fopen(fname, "w");
-+            break;
-+        default:
-+            break;
-+        }
-+    }
-+
-+    if (!f_delayon || !f_delayoff) {
-+        if (f_delayoff)
-+            fclose(f_delayoff);
-+        if (f_delayon)
-+            fclose(f_delayon);
-+
-+        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    switch (time) {
-+    case MLX_LED_BLINK_OFF:
-+        fprintf(f_delayoff, "%u", 0);
-+        fprintf(f_delayon, "%u", 0);
-+        break;
-+    case MLX_LED_BLINK_3HZ:
-+        fprintf(f_delayoff, "%u", 83);
-+        fprintf(f_delayon, "%u", 83);
-+        break;
-+    case MLX_LED_BLINK_6HZ:
-+        fprintf(f_delayoff, "%u", 167);
-+        fprintf(f_delayon, "%u", 167);
-+        break;
-+    default:
-+        break;
-+    }
-+
-+    fclose(f_delayon);
-+    fclose(f_delayoff);
-+
-+    rdata[0] = 0;
-+    *rdata_len = 1;
-+}
-+
-+
-+static unsigned char get_led_color(unsigned int led, unsigned char *color)
-+{
-+    FILE *f_green;
-+    FILE *f_red;
-+    FILE *f_amber;
-+    char line_green[10];
-+    char line_red[10];
-+    char line_amber[10];
-+    int red, green, amber;
-+    char fname[100];
-+    printf("get_led color\n");
-+    if (led <= sys_devices.status_led_number) {
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "%samber/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+
-+        f_amber = fopen(fname, "r");
-+        if (!f_amber) {
-+            printf("\nUnable to open LED status file");
-+            return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+        }
-+
-+        if (0 >= fread(line_amber, 1, sizeof(line_amber),f_amber)) {
-+            fclose(f_amber);
-+            return IPMI_INVALID_DATA_FIELD_CC;
-+        }
-+
-+        amber = strtoul(line_amber, NULL, 0);
-+
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "%sgreen/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+        f_green = fopen(fname, "r");
-+
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "%sred/%s", LED_STATUS_FILE, LED_BRIGHTNESS);
-+        f_red = fopen(fname, "r");
-+    }
-+    else {
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "%sgreen/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
-+        f_green = fopen(fname, "r");
-+
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "%sred/%u/%s", LED_FAN_FILE, led - sys_devices.status_led_number, LED_BRIGHTNESS);
-+        f_red = fopen(fname, "r");
-+    }
-+
-+    if (!f_green || !f_red) {
-+        printf("\nUnable to open LED status file");
-+        if (led <= sys_devices.status_led_number)
-+            fclose(f_amber);
-+        if (f_red)
-+            fclose(f_red);
-+        if (f_green)
-+            fclose(f_green);
-+
-+        return IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+    }
-+
-+    if ((0 >= fread(line_green, 1, sizeof(line_green),f_green))||
-+         (0 >= fread(line_red, 1, sizeof(line_red),f_red)))
-+    {
-+        if (led <= sys_devices.status_led_number)
-+            fclose(f_amber);
-+        fclose(f_green);
-+        fclose(f_red);
-+        return IPMI_INVALID_DATA_FIELD_CC;
-+    }
-+
-+    red = strtoul(line_red, NULL, 0);
-+    green = strtoul(line_green, NULL, 0);
-+
-+    if (led <= sys_devices.status_led_number) {
-+        if (amber && !green && !red)
-+            *color = LED_COLOR_AMBER;
-+        else if (!amber && green && !red)
-+            *color = LED_COLOR_GREEN;
-+        else
-+            *color = LED_COLOR_RED;
-+
-+        fclose(f_amber);
-+    }
-+    else {
-+        if (!red && green)
-+            *color = LED_COLOR_GREEN;
-+        else
-+            *color = LED_COLOR_RED;
-+    }
-+
-+    fclose(f_green);
-+    fclose(f_red);
-+
-+    return 0;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x31  LedNum
-+ *
-+ * LedNum:
-+ * 0x0 - status LED
-+ * 0x1 - FAN1 LED
-+ * 0x2 - FAN2 LED
-+ * 0x3 - FAN2 LED
-+ * 0x4 - FAN2 LED
-+ *
-+**/
-+static void
-+handle_get_led_state(lmc_data_t    *mc,
-+                     msg_t         *msg,
-+                     unsigned char *rdata,
-+                     unsigned int  *rdata_len,
-+                     void          *cb_data)
-+{
-+    unsigned int led;
-+    unsigned char color = LED_COLOR_RED;
-+    unsigned char rv = 0;
-+
-+    printf("get_led state\n");
-+    if (check_msg_length(msg, 1, rdata, rdata_len))
-+	return;
-+
-+    led = msg->data[0];
-+    if (led > sys_devices.status_led_number + sys_devices.fan_led_number) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    rdata[0] = 0;
-+    rdata[1] = 0;
-+
-+    rv = get_led_color(led, &color);
-+
-+    if (rv) {
-+        rdata[0] = rv;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    rdata[1] = color;
-+    *rdata_len = 2;
-+    return;
-+}
-+
 +/**
 + *
 + *  ipmitool mc cold reset
@@ -1658,6 +1036,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    rdata[0] = retval;
 +    *rdata_len = 1;
 +}
++
 +
 +/**
 + *
@@ -1811,84 +1190,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +
 +/**
 + *
-+ *  ipmitool raw 0x06  0x60
-+ *
-+ **/
-+static void
-+handle_reset_phy(lmc_data_t    *mc,
-+                     msg_t         *msg,
-+                     unsigned char *rdata,
-+                     unsigned int  *rdata_len,
-+                     void          *cb_data)
-+{
-+    printf("\n %d: %s, %s()", __LINE__, __FILE__, __FUNCTION__);
-+
-+    FILE *freset;
-+
-+    freset = fopen(MLX_RESET_PHY, "w");
-+
-+    if (!freset) {
-+            printf("\nUnable to open reset file");
-+            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+            *rdata_len = 1;
-+            return;
-+    } else {
-+        fprintf(freset, "%u", 0);
-+    }
-+
-+    fclose(freset);
-+    rdata[0] = 0;
-+    *rdata_len = 1;
-+}
-+
-+/**
-+ *
-+ *  ipmitool raw 0x06  0x61 (BMC - no value)
-+ *  ipmitool raw 0x06  0x61 1 (CPU)
-+ *
-+ **/
-+static void
-+handle_set_uart_to_bmc(lmc_data_t    *mc,
-+                     msg_t         *msg,
-+                     unsigned char *rdata,
-+                     unsigned int  *rdata_len,
-+                     void          *cb_data)
-+{
-+    printf("\n %d: %s, %s()", __LINE__, __FILE__, __FUNCTION__);
-+
-+    FILE *fset;
-+    unsigned int uart;
-+
-+    if (check_msg_length(msg, 1, rdata, rdata_len)) {
-+        uart = 0;
-+    }
-+    else {
-+        uart = msg->data[0];
-+        if (uart != 1 ) {
-+            rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+            *rdata_len = 1;
-+            return;
-+        }
-+    }
-+
-+    fset = fopen(MLX_UART_TO_BMC, "w");
-+
-+    if (!fset) {
-+            printf("\nUnable to open file");
-+            rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+            *rdata_len = 1;
-+            return;
-+    } else {
-+        fprintf(fset, "%u", uart);
-+    }
-+
-+    fclose(fset);
-+    rdata[0] = 0;
-+    *rdata_len = 1;
-+}
-+
-+/**
-+ *
 + *  ipmitool raw 0x06  0x5B size_LSB size_MSB
 + *
 + **/
@@ -1919,60 +1220,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    rdata[0] = system(sel_set_cmd_buf);
 +
 +    ipmi_mc_enable_sel(mc, max_entries, mc->sel.flags);
-+    *rdata_len = 1;
-+}
-+
-+/**
-+ *
-+ *  ipmitool raw 0x06  0x62 [zone] [enable/disable]
-+ *
-+ **/
-+static void
-+handle_thermal_algorithm_set(lmc_data_t    *mc,
-+                     msg_t         *msg,
-+                     unsigned char *rdata,
-+                     unsigned int  *rdata_len,
-+                     void          *cb_data)
-+{
-+    unsigned int zone, state;
-+    FILE *file;
-+    char fname[100];
-+
-+    if (check_msg_length(msg, 2, rdata, rdata_len))
-+        return;
-+
-+    zone = msg->data[0];
-+    if (zone >= MLX_MAX_THERMAL_ZONE) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    state = msg->data[1];
-+    if (state > 1) {
-+        rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+        *rdata_len = 1;
-+        return;
-+    }
-+
-+    memset(fname, 0, sizeof(fname));
-+    sprintf(fname, MLX_THERMAL_ZONE, zone);
-+    file = fopen(fname, "w");
-+
-+    if (!file) {
-+        rdata[0] = IPMI_COULD_NOT_PROVIDE_RESPONSE_CC;
-+        *rdata_len = 1;
-+     return;
-+    } else {
-+        if (state) 
-+            fprintf(file, "enabled");
-+        else
-+            fprintf(file, "disabled");
-+
-+        fclose(file);
-+    }
-+
-+    rdata[0] = 0;
 +    *rdata_len = 1;
 +}
 +
@@ -2051,50 +1298,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    }
 +
 +    return retval;
-+}
-+
-+/**
-+ *
-+ * ipmitool raw 0x04  0x35
-+ *
-+**/
-+static void
-+handle_get_total_power_cmd(lmc_data_t    *mc,
-+                           msg_t         *msg,
-+                           unsigned char *rdata,
-+                           unsigned int  *rdata_len,
-+                           void          *cb_data)
-+{
-+    unsigned char rv = 0;
-+    char line_pin[10];
-+    unsigned char total = 0;
-+    FILE *fpin;
-+
-+    for (int i = 0; i < MLX_PSU_COUNT; ++i) {
-+        char filename[50];
-+        unsigned int tmp = 0;
-+        memset(filename, 0, sizeof(filename));
-+        sprintf(filename, MLX_PSU_PIN_FILE, i+1);
-+
-+        fpin = fopen(filename, "r");
-+        if (fpin) {
-+            if (0 >= fread(line_pin, 1, sizeof(line_pin),fpin))
-+            {
-+                fclose(fpin);
-+                rdata[0] = IPMI_INVALID_DATA_FIELD_CC;
-+                *rdata_len = 1;
-+                return;
-+            }
-+            tmp = strtoul(line_pin, NULL, 0);
-+            total += tmp/1000000;
-+            fclose(fpin);
-+        }
-+    }
-+
-+    rdata[0] = 0;
-+    rdata[1] = total;
-+    *rdata_len = 2;
-+    return;
 +}
 +
 +/**
@@ -2251,38 +1454,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    sys->start_timer(reset_monitor_timer, &tv);
 +}
 +
-+static void
-+fans_monitor_timeout(void *cb_data)
-+{
-+    sys_data_t *sys = cb_data;
-+    struct timeval tv;
-+    int failed = 0;
-+    int i = 0;
-+    unsigned char fname[30];
-+
-+    for (i = 1; i <= sys_devices.fan_tacho_number; ++i) {
-+        memset(fname, 0, sizeof(fname));
-+        sprintf(fname, "/bsp/fan/fan%i_rpm", i);
-+        if (access(fname, F_OK) != 0)
-+            ++failed;
-+    }
-+
-+    if (failed == sys_devices.fan_tacho_number) {
-+        if (all_fans_failure == 0) {
-+            mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_FAN, 0 , 0, IPMI_EVENT_READING_TYPE_DISCRETE_DEVICE_ENABLE, 0x0);
-+            all_fans_failure = 1;
-+        }
-+    }
-+    else if (all_fans_failure == 1) {
-+        mlx_add_event_to_sel(sys->mc, IPMI_SENSOR_TYPE_FAN, 0 , 1, IPMI_EVENT_READING_TYPE_DISCRETE_DEVICE_ENABLE, 0x0);
-+        all_fans_failure = 0;
-+    }
-+
-+    tv.tv_sec = MLX_FANS_MONITOR_TIMEOUT;
-+    tv.tv_usec = 0;
-+    sys->start_timer(fans_monitor_timer, &tv);
-+}
-+
 +/*
 + * Chassis control get for the chassis.
 + */
@@ -2326,57 +1497,16 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +		 "Unable to allocate an mc: %s", strerror(rv));
 +	return rv;
 +    }
-+#if 0
-+    rv = set_fan_enable(MLX_FAN_PWM_ENABLE_FILE);
-+
-+    if (rv) {
-+        sys->log(sys, OS_ERROR, NULL,
-+                 "Unable to enable pwm_en: %s", strerror(rv));
-+    }
-+
-+    for (i = 0; i < MLX_FAN_MAX; ++i) {
-+        rv = set_fan_enable(fan_tacho_en[i]);
-+
-+        if (rv) {
-+            sys->log(sys, OS_ERROR, NULL,
-+                     "Unable to enable tacho for FAN%i: %s", i, strerror(rv));
-+        }
-+    }
-+#endif
-+#if 0
-+    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_SET_FAN_SPEED_CMD,
-+                                       handle_set_fan_speed_cmd, sys);
-+#endif
-+    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_GET_FAN_PWM_CMD,
-+                                       handle_get_fan_pwm_cmd, sys);
 +
 +    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_COLD_RESET_CMD,
 +                                       handle_bmc_cold_reset, sys);
 +
-+    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_READY_EVENT_CMD,
-+                                       handle_cpu_ready_event, sys);
-+#if 0
-+    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_HARD_RESET_CMD,
-+                                       handle_cpu_hard_reset, sys);
-+
-+    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_CPU_SOFT_RESET_CMD,
-+                                       handle_cpu_soft_reset, sys);
-+#endif
-+    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_RESET_PHY_CMD,
-+                                       handle_reset_phy, sys);
-+#if 0
-+    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_SET_UART_TO_BMC_CMD,
-+                                       handle_set_uart_to_bmc, sys);
-+#endif
-+
 +    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_SEL_BUFFER_SET_CMD,
 +                                       handle_sel_buffer_set, sys);
++
 +    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_GET_LAST_PROCESSED_EVENT_ID_CMD,
 +                                       handle_get_last_processed_event, sys);
-+#if 0
-+    rv = ipmi_emu_register_cmd_handler(IPMI_SENSOR_EVENT_NETFN, IPMI_OEM_MLX_GET_TOTAL_POWER_CMD,
-+                                       handle_get_total_power_cmd, sys);
-+#endif
++
 +    rv = ipmi_emu_register_cmd_handler(IPMI_APP_NETFN, IPMI_OEM_MLX_BMC_UPTIME_GET_CMD,
 +                                       handle_bmc_uptime_get, sys);
 +
@@ -2449,49 +1579,27 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +    }
 +
 +    fclose(fid);
++ 
 +
-+    memcpy(id_maj, id_line+11, 1);
-+    memcpy(id_min, id_line+13, 1);
++    memcpy(id_maj, id_line+10, 1);
++    memcpy(id_min, id_line+12, 1);
++    sys->log(sys, OS_ERROR, NULL, "maj:%s min:%s idline:%s ", id_maj, id_min, id_line);
 +
 +    fw_maj = strtoul(id_maj, NULL, 0);
 +    fw_min = strtoul(id_min, NULL, 0);
 +
++    sys->log(sys, OS_ERROR, NULL, "FW Version %d %d", fw_maj, fw_min);
++
 +    ipmi_mc_set_fw_revision(bmc_mc, fw_maj, fw_min);
 +
 +    productId = (sys->mc->product_id[1] << 8) | sys->mc->product_id[0];
-+    switch (productId) {
-+    case 1: /* Baidu BMC */
-+      printf("ProductID \n");
-+        sys_devices.fan_number = 4;
-+        sys_devices.fan_tacho_number = 4;
-+        sys_devices.fan_eeprom_number = 0;
-+        sys_devices.psu_number = 0;
-+        sys_devices.status_led_number = 0;
-+        sys_devices.fan_led_number = 0;
-+        break;
-+    default:
-+        break;
-+    }
-+
-+    rv = sys->alloc_timer(sys, fans_monitor_timeout, sys, &fans_monitor_timer);
-+    if (rv) {
-+        int errval = errno;
-+        sys->log(sys, SETUP_ERROR, NULL, "Unable to create FANs monitoring timer");
-+        return errval;
-+    }
-+    else {
-+        tv.tv_sec = MLX_FANS_MONITOR_TIMEOUT;
-+        tv.tv_usec = 0;
-+        printf("start fan timer \n");
-+        sys->start_timer(fans_monitor_timer, &tv);
-+    }
 +
 +    return 0;
 +}
 diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 --- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.hw	2018-10-31 14:27:35.099592000 -0400
-@@ -0,0 +1,205 @@
++++ b/lanserv/mlxbw/mlxbw.hw	2019-04-10 09:11:57.588989000 -0400
+@@ -0,0 +1,204 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
 +# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
@@ -2513,7 +1621,6 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +
 +
 +#Product ID:
-+# 1 - Baidu BMC
 +# 2 - Bluewhale BMC
 +
 +# Now add the BMC
@@ -2521,7 +1628,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +#                                      FW    FW    Sup   ID       Id
 +#                                      Rev   Rev
 +# MFG ID is the IANA.org number - 33049 for MLNX
-+mc_add 0x20 1 has-device-sdrs  0x01  0x01  0x00  0x9f  0x008119 0x0002 persist_sdr
++mc_add 0x20 1 has-device-sdrs  0x01  0x00  0x00  0x9f  0x008119 0x0002 persist_sdr
 +
 +#Enable SEL device
 +sel_enable 0x20 1000 0x0a
@@ -2699,7 +1806,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +mc_enable 0x20
 diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 --- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2018-10-31 14:27:35.102548000 -0400
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-04-05 09:48:45.133239000 -0400
 @@ -0,0 +1,376 @@
 +#!/bin/bash
 +
@@ -3079,7 +2186,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2018-10-31 14:27:35.104550000 -0400
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-04-05 09:48:45.135240000 -0400
 @@ -0,0 +1,77 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -3149,7 +2256,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +
 +  sol "/dev/ttyS0" 115200 nortscts history=65530 historyfru=10
 +
-+  serial bt localhost 9012 codec BT_Mode
++#  serial bt localhost 9012 codec BT_Mode
 +
 +# Dynamically load a module to extend the simulator.  After the module is
 +# loaded, if the function "ipmi_sim_module_init" is defined in the module,
@@ -3160,7 +2267,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2018-10-31 14:27:35.107547000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2019-04-05 09:48:45.139240000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -4717,9 +3824,9 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2018-10-31 14:27:35.109567000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2019-04-05 09:48:45.142240000 -0400
 @@ -0,0 +1,31 @@
-+last_add_time:i:1532443877
++last_add_time:i:1549654305
 +30:d:\1e\00Q\01= \00\1f\07\18\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
 +29:d:\1d\00Q\018 \00\1e\07\17\7fH\03\01\00\02\00"\10\10\00\05\00\00,@\00\01\01\c0\01\93\00\00\00\00\00\ad\00\00\00\00\02\02\00\00\00\cdvr_vcore_iout
 +28:d:\1c\00Q\019 \00\b5\07\16\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cebf_vccinp_3p3v
@@ -4743,7 +3850,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +10:d:\0a\00Q\012 \00\a3\07\04\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\c7mb_3p3v
 +9:d:\09\00Q\017 \00\a2\07\03\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_3p3v_stby
 +8:d:\08\00Q\016 \00\a1\07\02\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cbmb_3p3v_aux
-+7:d:\07\00Q\011 \00\a0\07\01\7fH\02\01\04"\04"\12\12\00\04\00\00d\00\00\01\01\d0\01x\00\00\00\00\00z\00\00v\00\02\02\00\00\00\c6vr_vin
++7:d:\07\00Q\011 \00\a0\07\01\7fH\02\01\04"\04"\12\12\00\04\00\00d\00\00\01\01\d0\01x\00\00\00\00\00\80\00\00s\00\03\03\00\00\00\c6vr_vin
 +6:d:\06\00Q\013 \00r\1d\03\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan3_rpm
 +5:d:\05\00Q\013 \00q\1d\02\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan2_rpm
 +4:d:\04\00Q\013 \00p\1d\01\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan1_rpm
@@ -4752,7 +3859,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
 diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
 --- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sel_set_log_size.sh	2018-10-31 14:27:35.111551000 -0400
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-04-05 09:48:45.144241000 -0400
 @@ -0,0 +1,21 @@
 +#!/bin/bash
 +
@@ -4775,3 +3882,57 @@ diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.s
 +else
 +        sed -i'' "s/^sel_enable \([0-9x]*\) [^ ]* \([0-9x]*\)/sel_enable \1 $H_SIZE \2/g" /etc/ipmi/mlxbw.hw
 +fi
+diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
+--- a/sample/ipmi_serial_bmc_emu.c	2013-03-08 16:53:01.000000000 -0500
++++ b/sample/ipmi_serial_bmc_emu.c	2019-04-05 09:46:34.813868000 -0400
+@@ -42,7 +42,7 @@
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <sys/select.h>
+-#include <editline/readline.h>
++#include <readline/readline.h>
+ 
+ #define _GNU_SOURCE
+ #include <getopt.h>
+diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
+--- a/tcl/Makefile.am	2018-12-13 21:08:29.000000000 -0500
++++ b/tcl/Makefile.am	2019-04-05 09:37:00.658441000 -0400
+@@ -11,7 +11,7 @@
+ libOpenIPMItcl_la_CFLAGS = $(AM_CFLAGS)
+ libOpenIPMItcl_la_LIBADD = $(GDBM_LIB)
+ libOpenIPMItcl_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION) \
+-	$(TCL_LIBS) -rpath $(libdir)
++	$(TCL_LIBS)
+ 
+ noinst_PROGRAMS = test_handlers
+ 
+diff -ruN a/unix/Makefile.am b/unix/Makefile.am
+--- a/unix/Makefile.am	2019-03-28 11:08:14.832866000 -0400
++++ b/unix/Makefile.am	2019-04-05 09:44:52.219934000 -0400
+@@ -10,24 +10,10 @@
+ libOpenIPMIpthread_la_SOURCES = posix_thread_os_hnd.c selector.c
+ libOpenIPMIpthread_la_LIBADD = -lpthread $(GDBM_LIB) \
+ 	$(top_builddir)/utils/libOpenIPMIutils.la $(RT_LIB)
+-libOpenIPMIpthread_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION) \
+-	-L$(libdir)
++libOpenIPMIpthread_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION)
+ 
+ libOpenIPMIposix_la_SOURCES = posix_os_hnd.c selector.c
+ libOpenIPMIposix_la_LIBADD = $(top_builddir)/utils/libOpenIPMIutils.la \
+ 	$(GDBM_LIB) $(RT_LIB)
+ libOpenIPMIposix_la_LDFLAGS = -rdynamic -version-info $(LD_VERSION) \
+-	-L$(libdir)
+-
+-noinst_HEADERS = heap.h
+-
+-noinst_PROGRAMS = test_heap test_handlers
+-
+-test_heap_SOURCES = test_heap.c
+-test_heap_LDADD = 
+-
+-test_handlers_SOURCES = test_handlers.c
+-test_handlers_LDADD = libOpenIPMIposix.la libOpenIPMIpthread.la \
+-	$(top_builddir)/utils/libOpenIPMIutils.la $(GDBM_LIB)
+-
+-TESTS = test_heap test_handlers
++	$(GLIB_LIBS)

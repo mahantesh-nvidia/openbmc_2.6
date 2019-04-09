@@ -6,6 +6,7 @@ DEPENDS = " \
     openssl \
     popt \
     zlib \
+    readline \
     ncurses \
     glib-2.0 \
     gdbm \

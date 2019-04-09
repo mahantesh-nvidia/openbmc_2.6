@@ -15,7 +15,7 @@ important software components to note are listed below:
     U-Boot bootloader (v2016.07)
     Linux kernel (v4.19.13)
     OpenBMC distro (v2.6)
-    OpenIPMI package (v2.0.22)
+    OpenIPMI package (v2.0.27)
 
 
 BMC source code tarball
