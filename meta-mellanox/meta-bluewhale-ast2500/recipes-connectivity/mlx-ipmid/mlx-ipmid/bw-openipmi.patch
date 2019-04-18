@@ -1,6 +1,6 @@
 diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
---- a/cmdlang/Makefile.am	2019-03-28 11:04:30.607379000 -0400
-+++ b/cmdlang/Makefile.am	2019-04-05 09:31:30.469097000 -0400
+--- a/cmdlang/Makefile.am	2018-06-11 13:20:16.000000000 -0400
++++ b/cmdlang/Makefile.am	2019-04-18 13:28:42.576890000 -0400
 @@ -15,8 +15,7 @@
  libOpenIPMIcmdlang_la_LIBADD = -lm \
  	$(top_builddir)/utils/libOpenIPMIutils.la \
@@ -13,7 +13,7 @@ diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
  
 diff -ruN a/configure.ac b/configure.ac
 --- a/configure.ac	2019-03-05 19:23:23.000000000 -0500
-+++ b/configure.ac	2019-04-05 10:41:49.816871000 -0400
++++ b/configure.ac	2019-04-18 13:28:42.589881000 -0400
 @@ -267,6 +267,15 @@
  )
  AC_SUBST([MARVELL_BMC_DIR])
@@ -40,7 +40,7 @@ diff -ruN a/configure.ac b/configure.ac
  	  man/Makefile
 diff -ruN a/include/OpenIPMI/ipmi_mlx.h b/include/OpenIPMI/ipmi_mlx.h
 --- a/include/OpenIPMI/ipmi_mlx.h	1969-12-31 19:00:00.000000000 -0500
-+++ b/include/OpenIPMI/ipmi_mlx.h	2019-04-05 10:09:38.074943000 -0400
++++ b/include/OpenIPMI/ipmi_mlx.h	2019-04-18 13:28:42.602881000 -0400
 @@ -0,0 +1,19 @@
 +/*
 + * ipmi_mlx.h
@@ -63,7 +63,7 @@ diff -ruN a/include/OpenIPMI/ipmi_mlx.h b/include/OpenIPMI/ipmi_mlx.h
 +#endif /* _IPMI_MLX_H */
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
 --- a/lanserv/bmc_app.c	2017-09-18 20:27:17.000000000 -0400
-+++ b/lanserv/bmc_app.c	2019-04-05 10:53:23.765836000 -0400
++++ b/lanserv/bmc_app.c	2019-04-18 13:28:42.617880000 -0400
 @@ -58,6 +58,13 @@
  #include <OpenIPMI/ipmi_mc.h>
  #include <OpenIPMI/ipmi_lan.h>
@@ -163,7 +163,7 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
  
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
 --- a/lanserv/ipmi_sim.c	2018-12-20 15:14:45.000000000 -0500
-+++ b/lanserv/ipmi_sim.c	2019-04-05 10:52:42.063681000 -0400
++++ b/lanserv/ipmi_sim.c	2019-04-18 13:28:42.637881000 -0400
 @@ -90,14 +90,22 @@
  #include <OpenIPMI/serv.h>
  #include <OpenIPMI/lanserv.h>
@@ -364,7 +364,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  	    free(command_file);
 diff -ruN a/lanserv/lanserv_ipmi.c b/lanserv/lanserv_ipmi.c
 --- a/lanserv/lanserv_ipmi.c	2019-01-05 00:22:18.000000000 -0500
-+++ b/lanserv/lanserv_ipmi.c	2019-04-05 09:56:08.341309000 -0400
++++ b/lanserv/lanserv_ipmi.c	2019-04-18 13:28:42.663881000 -0400
 @@ -2864,7 +2864,7 @@
  
  	if (session == NULL) {
@@ -385,7 +385,7 @@ diff -ruN a/lanserv/lanserv_ipmi.c b/lanserv/lanserv_ipmi.c
  
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
 --- a/lanserv/Makefile.am	2017-08-03 09:23:57.000000000 -0400
-+++ b/lanserv/Makefile.am	2019-04-05 10:42:32.331011000 -0400
++++ b/lanserv/Makefile.am	2019-04-18 13:28:42.695881000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
@@ -493,7 +493,7 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
 +CLEANFILES = libIPMIlanserv.map
 diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-04-05 09:48:45.116241000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-04-18 13:28:42.729879000 -0400
 @@ -0,0 +1,18 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -515,7 +515,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.
 +
 diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-04-05 09:48:45.119240000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-04-18 13:28:42.759879000 -0400
 @@ -0,0 +1,65 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -584,7 +584,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-h
 +SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/lancontrol	2019-04-05 09:48:45.122240000 -0400
++++ b/lanserv/mlxbw/lancontrol	2019-04-18 13:28:42.786887000 -0400
 @@ -0,0 +1,295 @@
 +#!/bin/sh
 +
@@ -883,7 +883,7 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2019-04-05 09:48:45.124241000 -0400
++++ b/lanserv/mlxbw/Makefile.am	2019-04-18 13:28:42.815878000 -0400
 @@ -0,0 +1,24 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
@@ -911,8 +911,8 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2019-04-10 10:49:09.691679000 -0400
-@@ -0,0 +1,683 @@
++++ b/lanserv/mlxbw/mlxbw.c	2019-04-19 09:51:42.897095000 -0400
+@@ -0,0 +1,698 @@
 +/*
 + * mlxbw.c
 + *
@@ -972,6 +972,9 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +#define MLX_SYS_HARD_RESET   "/bsp/reset/system_reset_hard"
 +
 +#define MLX_UPTIME_FILE      "/proc/uptime"
++
++#define	SYSTEM_RETURN_STATUS_OFFSET 8
++#define	BF_POWER_UNKNOWN_STATE      2
 +
 +#ifdef BLUEWHALE_RESET_CAUSE
 +static const char* reset_cause[8] =
@@ -1461,8 +1464,20 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +bmc_get_chassis_control(lmc_data_t *mc, int op, unsigned char *val,
 +			void *cb_data)
 +{
-+    *val = 1;
-+    return 0;
++    if (op == CHASSIS_CONTROL_POWER) {
++	int rval = 0;
++	rval = system("/usr/sbin/mlnx_powerstatus_bf");
++	rval = (unsigned char)(rval >> SYSTEM_RETURN_STATUS_OFFSET);
++
++	if (rval == BF_POWER_UNKNOWN_STATE)
++		return EINVAL;
++
++	*val = rval;
++	return 0;
++    }
++
++    /* This doesn't make sense for anything else */
++    return EINVAL;
 +}
 +
 +int
@@ -1598,7 +1613,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +}
 diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 --- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.hw	2019-04-10 09:11:57.588989000 -0400
++++ b/lanserv/mlxbw/mlxbw.hw	2019-04-18 13:28:42.878876000 -0400
 @@ -0,0 +1,204 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -1806,7 +1821,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +mc_enable 0x20
 diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 --- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-04-05 09:48:45.133239000 -0400
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-04-18 13:28:42.912874000 -0400
 @@ -0,0 +1,376 @@
 +#!/bin/bash
 +
@@ -2186,7 +2201,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-04-05 09:48:45.135240000 -0400
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-04-18 13:28:42.944877000 -0400
 @@ -0,0 +1,77 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -2267,7 +2282,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2019-04-05 09:48:45.139240000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2019-04-18 13:28:42.982874000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -3824,7 +3839,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2019-04-05 09:48:45.142240000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2019-04-18 13:28:43.014886000 -0400
 @@ -0,0 +1,31 @@
 +last_add_time:i:1549654305
 +30:d:\1e\00Q\01= \00\1f\07\18\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
@@ -3859,7 +3874,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
 diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
 --- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-04-05 09:48:45.144241000 -0400
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-04-18 13:28:43.047895000 -0400
 @@ -0,0 +1,21 @@
 +#!/bin/bash
 +
@@ -3884,7 +3899,7 @@ diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.s
 +fi
 diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
 --- a/sample/ipmi_serial_bmc_emu.c	2013-03-08 16:53:01.000000000 -0500
-+++ b/sample/ipmi_serial_bmc_emu.c	2019-04-05 09:46:34.813868000 -0400
++++ b/sample/ipmi_serial_bmc_emu.c	2019-04-18 13:28:43.102874000 -0400
 @@ -42,7 +42,7 @@
  #include <unistd.h>
  #include <stdlib.h>
@@ -3896,7 +3911,7 @@ diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
  #include <getopt.h>
 diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
 --- a/tcl/Makefile.am	2018-12-13 21:08:29.000000000 -0500
-+++ b/tcl/Makefile.am	2019-04-05 09:37:00.658441000 -0400
++++ b/tcl/Makefile.am	2019-04-18 13:28:43.164870000 -0400
 @@ -11,7 +11,7 @@
  libOpenIPMItcl_la_CFLAGS = $(AM_CFLAGS)
  libOpenIPMItcl_la_LIBADD = $(GDBM_LIB)
@@ -3907,8 +3922,8 @@ diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
  noinst_PROGRAMS = test_handlers
  
 diff -ruN a/unix/Makefile.am b/unix/Makefile.am
---- a/unix/Makefile.am	2019-03-28 11:08:14.832866000 -0400
-+++ b/unix/Makefile.am	2019-04-05 09:44:52.219934000 -0400
+--- a/unix/Makefile.am	2017-07-26 22:19:06.000000000 -0400
++++ b/unix/Makefile.am	2019-04-18 13:28:43.180888000 -0400
 @@ -10,24 +10,10 @@
  libOpenIPMIpthread_la_SOURCES = posix_thread_os_hnd.c selector.c
  libOpenIPMIpthread_la_LIBADD = -lpthread $(GDBM_LIB) \

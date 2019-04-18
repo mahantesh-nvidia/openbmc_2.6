@@ -59,6 +59,7 @@ do_install() {
     install -m 0755 ${B}/mlnx_powercycle_bf.sh ${D}${sbindir}/mlnx_powercycle_bf
     install -m 0755 ${B}/mlnx_poweron_bf.sh ${D}${sbindir}/mlnx_poweron_bf
     install -m 0755 ${B}/mlnx_poweroff_bf.sh ${D}${sbindir}/mlnx_poweroff_bf
+    install -m 0755 ${B}/mlnx_powerstatus_bf.sh ${D}${sbindir}/mlnx_powerstatus_bf
     install -m 0644 ${B}/images/*.svf ${D}/usr/share/mellanox
 }
 
