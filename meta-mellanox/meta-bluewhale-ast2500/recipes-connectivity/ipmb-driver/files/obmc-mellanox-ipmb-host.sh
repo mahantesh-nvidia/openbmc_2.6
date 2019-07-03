@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Date modified: 02/18/2020
+# Date modified: 07/10/2020
 
 # This script checks if the ipmb_host driver loaded and
 # if the BF is up via the BMC GPIO pins 218.
@@ -8,7 +8,7 @@
 I2C12_DEV_PATH=/sys/bus/i2c/devices/i2c-12/new_device
 I2C12_DEL_DEV_PATH=/sys/bus/i2c/devices/i2c-12/delete_device
 IPMB_HOST_ADD=0x1020
-SLAVE_ADD=0x11
+SLAVE_ADD=0x30
 
 if ! lsmod | grep ipmb_host &> /dev/null; then
 	mlnx_powerstatus_bf
