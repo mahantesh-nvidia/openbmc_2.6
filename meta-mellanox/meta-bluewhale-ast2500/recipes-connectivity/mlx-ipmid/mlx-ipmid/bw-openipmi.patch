@@ -1,6 +1,6 @@
 diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
 --- a/cmdlang/Makefile.am	2018-06-11 13:20:16.000000000 -0400
-+++ b/cmdlang/Makefile.am	2019-04-18 13:28:42.576890000 -0400
++++ b/cmdlang/Makefile.am	2019-07-26 11:54:24.191390000 -0400
 @@ -15,8 +15,7 @@
  libOpenIPMIcmdlang_la_LIBADD = -lm \
  	$(top_builddir)/utils/libOpenIPMIutils.la \
@@ -38,84 +38,20 @@ diff -ruN a/configure.ac b/configure.ac
  	  sample/Makefile
  	  doc/Makefile
  	  man/Makefile
-diff -ruN a/include/OpenIPMI/ipmi_mlx.h b/include/OpenIPMI/ipmi_mlx.h
---- a/include/OpenIPMI/ipmi_mlx.h	1969-12-31 19:00:00.000000000 -0500
-+++ b/include/OpenIPMI/ipmi_mlx.h	2019-04-18 13:28:42.602881000 -0400
-@@ -0,0 +1,19 @@
-+/*
-+ * ipmi_mlx.h
-+ */
-+
-+#ifndef _IPMI_MLX_H
-+#define _IPMI_MLX_H
-+
-+#include <OpenIPMI/mcserv.h>
-+
-+#define MLX_EVENT_TO_SEL_BUF_SIZE           13
-+#define MLX_EVENT_DIRECTION_SHIFT           7
-+
-+void mlx_add_event_to_sel(lmc_data_t    *mc,
-+                          unsigned char sensor_type,
-+                          unsigned char sensor_num,
-+                          unsigned char direction,
-+                          unsigned char event_type,
-+                          unsigned char offset);
-+#endif /* _IPMI_MLX_H */
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
 --- a/lanserv/bmc_app.c	2017-09-18 20:27:17.000000000 -0400
-+++ b/lanserv/bmc_app.c	2019-04-18 13:28:42.617880000 -0400
-@@ -58,6 +58,13 @@
++++ b/lanserv/bmc_app.c	2019-07-26 12:59:24.255604000 -0400
+@@ -58,6 +58,9 @@
  #include <OpenIPMI/ipmi_mc.h>
  #include <OpenIPMI/ipmi_lan.h>
  
 +#include <config.h>
 +#include <stdlib.h>
 +
-+#ifdef MLX_BW_IPMID
-+#include <OpenIPMI/ipmi_mlx.h>
-+#endif /* ifdef MLX_BW_IPMID */
-+
  static void
  handle_get_device_id(lmc_data_t    *mc,
  		     msg_t         *msg,
-@@ -178,6 +185,36 @@
-     *rdata_len = 7;
- }
- 
-+#ifdef MLX_BW_IPMID
-+void
-+mlx_add_event_to_sel(lmc_data_t    *mc,
-+           unsigned char sensor_type,
-+           unsigned char sensor_num,
-+           unsigned char direction,
-+           unsigned char event_type,
-+           unsigned char offset)
-+{
-+    lmc_data_t    *dest_mc;
-+    unsigned char data[MLX_EVENT_TO_SEL_BUF_SIZE];
-+    int           rv;
-+
-+    rv = ipmi_emu_get_mc_by_addr(mc->emu, mc->event_receiver, &dest_mc);
-+    if (rv)
-+        return;
-+
-+    memset(data, 0, MLX_EVENT_TO_SEL_BUF_SIZE);
-+
-+    data[4] = mc->ipmb;
-+    data[6] = 0x04; /* Event message revision for IPMI 1.5. */
-+    data[7] = sensor_type;
-+    data[8] = sensor_num;
-+    data[9] = (direction << MLX_EVENT_DIRECTION_SHIFT) | event_type;
-+    data[10] = offset;
-+
-+    mc_new_event(dest_mc, 0x02, data);
-+}
-+#endif /* ifdef MLX_BW_IPMID */
-+
- void
- watchdog_timeout(void *cb_data)
- {
-@@ -188,11 +225,13 @@
+@@ -188,11 +191,13 @@
      if (!mc->watchdog_running)
  	goto out;
  
@@ -129,15 +65,7 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
  
      if (! mc->watchdog_preaction_ran) {
  	struct timeval tv, now;
-@@ -231,6 +270,7 @@
-  do_full_expiry:
-     mc->watchdog_running = 0; /* Stop the watchdog on a timeout */
-     mc->watchdog_expired |= (1 << IPMI_MC_WATCHDOG_GET_USE(mc));
-+
-     switch (IPMI_MC_WATCHDOG_GET_ACTION(mc)) {
-     case IPMI_MC_WATCHDOG_ACTION_NONE:
- 	set_sensor_bit(mc, sens, 0, 1, 0xc0, mc->watchdog_use & 0xf, 0xff, 1);
-@@ -265,12 +305,13 @@
+@@ -265,12 +270,13 @@
  do_watchdog_reset(lmc_data_t *mc)
  {
      struct timeval tv;
@@ -152,29 +80,10 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
      mc->watchdog_preaction_ran = 0;
  
      /* Timeout is in tenths of a second, offset is in seconds */
-@@ -285,7 +326,7 @@
- 	    tv.tv_usec = 0;
- 	}
-     }
--    mc->watchdog_running = 1;
-+    mc->watchdog_running = 1; 
-     mc->sysinfo->start_timer(mc->watchdog_timer, &tv);
- }
- 
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
 --- a/lanserv/ipmi_sim.c	2018-12-20 15:14:45.000000000 -0500
-+++ b/lanserv/ipmi_sim.c	2019-04-18 13:28:42.637881000 -0400
-@@ -90,14 +90,22 @@
- #include <OpenIPMI/serv.h>
- #include <OpenIPMI/lanserv.h>
- #include <OpenIPMI/serserv.h>
--
-+#ifdef MLX_BW_IPMID
-+#include <OpenIPMI/ipmi_types.h>
-+#endif /* ifdef MLX_BW_IPMID */
- #include "emu.h"
- #include <OpenIPMI/persist.h>
- 
++++ b/lanserv/ipmi_sim.c	2019-07-26 11:03:39.721847000 -0400
+@@ -97,7 +97,13 @@
  #define MAX_ADDR 4
  
  #define BASE_CONF_STR SYSCONFDIR "/ipmi"
@@ -188,7 +97,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  static const char *statedir = STATEDIR;
  static char *command_string = NULL;
  static char *command_file = NULL;
-@@ -308,6 +316,31 @@
+@@ -308,6 +314,31 @@
      return;
  }
  
@@ -220,124 +129,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  static int
  open_lan_fd(struct sockaddr *addr, socklen_t addr_len)
  {
-@@ -475,96 +508,15 @@
- static int
- ser_channel_init(void *info, channel_t *chan)
- {
--    misc_data_t *data = info;
-     serserv_data_t *ser = chan->chan_info;
--    int err;
--    int fd;
--    struct sockaddr *addr = &ser->addr.addr.s_ipsock.s_addr0;
--    os_hnd_fd_id_t *fd_id;
--    int val;
--
--    ser->os_hnd = data->os_hnd;
--    ser->user_info = data;
--    ser->send_out = ser_send;
--
--    err = serserv_init(ser);
--    if (err) {
--	fprintf(stderr, "Unable to init serial: 0x%x\n", err);
--	exit(1);
--    }
--
--    fd = socket(addr->sa_family, SOCK_STREAM, IPPROTO_TCP);
--    if (fd == -1) {
--	perror("Unable to create socket");
--	exit(1);
--    }
--
--    if (ser->do_connect) {
--	err = connect(fd, addr, ser->addr.addr_len);
--	if (err == -1) {
--	    fprintf(stderr, "Unable to connect to serial TCP port: %s\n",
--		    strerror(errno));
--	    exit(1);
--	}
--	ser->con_fd = fd;
--	ser->bind_fd = -1;
--
--	err = data->os_hnd->add_fd_to_wait_for(data->os_hnd, ser->con_fd,
--					       ser_data_ready, ser,
--					       NULL, &fd_id);
--	if (err) {
--	    fprintf(stderr, "Unable to add serial socket wait: 0x%x\n", err);
--	    exit(1);
--	}
--    } else {
--        int opt = 1;
--
--	err = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
--	if (err == -1) {
--	    fprintf(stderr, "Unable to set SO_REUSEADDR on serial TCP: %s\n",
--		    strerror(errno));
--	    exit(1);
--	}
--
--	err = bind(fd, addr, ser->addr.addr_len);
--	if (err == -1) {
--	    fprintf(stderr, "Unable to bind to serial TCP port: %s\n",
--		    strerror(errno));
--	    exit(1);
--	}
--	ser->bind_fd = fd;
--	ser->con_fd = -1;
--
--	err = listen(fd, 1);
--	if (err == -1) {
--	    fprintf(stderr, "Unable to listen to serial TCP port: %s\n",
--		    strerror(errno));
--	    exit(1);
--	}
--
--	val = 1;
--	err = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (char *)&val,
--			 sizeof(val));
--	if (err == -1) {
--	    fprintf(stderr, "Unable to set SO_REUSEADDR on socket: %s\n",
--		    strerror(errno));
--	    exit(1);
--	}
--	
--
--	err = data->os_hnd->add_fd_to_wait_for(data->os_hnd, ser->bind_fd,
--					       ser_bind_ready, ser,
--					       NULL, &fd_id);
--	if (err) {
--	    fprintf(stderr, "Unable to add serial socket wait: 0x%x\n", err);
--	    exit(1);
--	}
--    }
--
--    if (!err)
--	isim_add_fd(fd);
--
--    return err;
-+    switch(ser->channel.protocol_type) {
-+        default:
-+            return -1;
-+            break;
-+    }
-+    fprintf(stderr, "init serial unexpected exit\n");
-+    return -1;
-+ 
- }
- 
- static void
-@@ -1499,8 +1451,10 @@
-     sysinfo.sol = ipmi_mc_get_sol(mc);
- 
-     if (read_config(&sysinfo, config_file, print_version))
-+    {
-+      fprintf(stderr, "read config error\n");
- 	exit(1);
--
-+    }
-     if (print_version)
- 	exit(0);
- 
-@@ -1509,7 +1463,11 @@
+@@ -1509,7 +1540,11 @@
  	exit(1);
      }
  
@@ -349,7 +141,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
      if (err) {
  	fprintf(stderr, "Unable to initialize persistence: %s\n",
  		strerror(err));
-@@ -1546,7 +1504,11 @@
+@@ -1546,7 +1581,11 @@
  	strcpy(command_file, BASE_CONF_STR);
  	strcat(command_file, "/");
  	strcat(command_file, sysinfo.name);
@@ -362,30 +154,9 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  	tf = fopen(command_file, "r");
  	if (!tf) {
  	    free(command_file);
-diff -ruN a/lanserv/lanserv_ipmi.c b/lanserv/lanserv_ipmi.c
---- a/lanserv/lanserv_ipmi.c	2019-01-05 00:22:18.000000000 -0500
-+++ b/lanserv/lanserv_ipmi.c	2019-04-18 13:28:42.663881000 -0400
-@@ -2864,7 +2864,7 @@
- 
- 	if (session == NULL) {
- 	    lan->sysinfo->log(lan->sysinfo, INVALID_MSG, msg,
--		     "Normal session message failure: Invalid SID");
-+		     "Normal RMCPP session message failure: Invalid SID");
- 	    return;
- 	}
- 
-@@ -2971,7 +2971,7 @@
- 
- 	if (session == NULL) {
- 	    lan->sysinfo->log(lan->sysinfo, INVALID_MSG, msg,
--		     "Normal session message failure: Invalid SID");
-+		     "Normal RMCP session message failure: Invalid SID");
- 	    return;
- 	}
- 
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
---- a/lanserv/Makefile.am	2017-08-03 09:23:57.000000000 -0400
-+++ b/lanserv/Makefile.am	2019-04-18 13:28:42.695881000 -0400
+--- a/lanserv/Makefile.am	2019-07-26 11:43:20.761792000 -0400
++++ b/lanserv/Makefile.am	2019-07-26 11:08:47.497992000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
@@ -397,53 +168,42 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
  
  AM_CFLAGS = -Wall -Wsign-compare -I$(top_srcdir)/include -DIPMI_CHECK_LOCKS \
  	$(OPENSSLINCS) -DPVERSION="\"$(PVERSION)\""
-@@ -15,19 +15,12 @@
- AM_CPPFLAGS = -DSYSCONFDIR='"$(sysconfdir)"' -DSTATEDIR='"$(localstatedir)"'
- 
- lib_LTLIBRARIES = libIPMIlanserv.la
--
--if HAVE_OPENIPMI_SMI
--IPMILAN_PROG = ipmilan
--IPMILAN_MAN = ipmilan.8
--IPMILAN_NOMAN =
-+if MLX_BW_IPMID
-+bin_PROGRAMS = mlx_ipmid ipmilan
- else
--IPMILANPROG =
--IPMILAN_MAN =
--IPMILAN_NOMAN = ipmilan.8
-+bin_PROGRAMS = ipmi_sim ipmilan
+@@ -26,7 +26,11 @@
+ IPMILAN_NOMAN = ipmilan.8
  endif
  
--bin_PROGRAMS = ipmi_sim $(IPMILAN_PROG)
--
++if MLX_BW_IPMID
++bin_PROGRAMS = mlx_ipmid $(IPMILAN_PROG)
++else
+ bin_PROGRAMS = ipmi_sim $(IPMILAN_PROG)
++endif
+ 
  noinst_PROGRAMS = ipmi_checksum
  
- noinst_HEADERS = emu.h bmc.h
-@@ -35,48 +28,49 @@
+@@ -35,7 +39,7 @@
  libIPMIlanserv_la_SOURCES = lanserv_ipmi.c lanserv_asf.c priv_table.c \
  	lanserv_oem_force.c lanserv_config.c config.c serv.c serial_ipmi.c \
  	persist.c extcmd.c
 -libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl $(RT_LIB)
 +libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl
  libIPMIlanserv_la_LDFLAGS = -version-info $(LD_VERSION) \
-+	-Wl,-Map -Wl,libIPMIlanserv.map \
  	../utils/libOpenIPMIutils.la
  
- ipmi_checksum_SOURCES = ipmi_checksum.c
+@@ -43,17 +47,27 @@
  
--if HAVE_OPENIPMI_SMI
+ if HAVE_OPENIPMI_SMI
  ipmilan_SOURCES = lanserv.c
 -ipmilan_LDADD = $(POPTLIBS) libIPMIlanserv.la -ldl $(RT_LIB)
 +ipmilan_LDADD = $(POPTLIBS) libIPMIlanserv.la -ldl
  ipmilan_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
  	../utils/libOpenIPMIutils.la
--endif
+ endif
+ 
 +if MLX_BW_IPMID
 +mlx_ipmid_SOURCES = ipmi_sim.c bmc.c emu_cmd.c sol.c \
 +	bmc_storage.c bmc_app.c bmc_chassis.c bmc_transport.c \
 +	bmc_sensor.c bmc_picmg.c
- 
++
 +mlx_ipmid_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread
 +mlx_ipmid_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
 +	../utils/libOpenIPMIutils.la
@@ -452,45 +212,26 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
  	bmc_storage.c bmc_app.c bmc_chassis.c bmc_transport.c \
  	bmc_sensor.c bmc_picmg.c
 -ipmi_sim_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread $(RT_LIB)
-+
 +ipmi_sim_LDADD = $(POPTLIBS) libIPMIlanserv.la -lpthread
  ipmi_sim_LDFLAGS = -rdynamic ../unix/libOpenIPMIposix.la \
--	../utils/libOpenIPMIutils.la $(SOCKETLIB)
-+	../utils/libOpenIPMIutils.la
+ 	../utils/libOpenIPMIutils.la $(SOCKETLIB)
 +endif
  
--man_MANS = $(IPMILAN_MAN) ipmi_lan.5 ipmi_sim.1 ipmi_sim_cmd.5
-+man_MANS = ipmilan.8 ipmi_lan.5 ipmi_sim.1 ipmi_sim_cmd.5
+ man_MANS = $(IPMILAN_MAN) ipmi_lan.5 ipmi_sim.1 ipmi_sim_cmd.5
  
--READMES = README.ipmi_sim README.vm README.design README.yourownbmc
--EXTRA_DIST = atca.emu lan.conf ipmisim1.emu ipmisim1.sdrs \
--	$(man_MANS) $(IPMILAN_NOMAN) $(READMES)
-+EXTRA_DIST = atca.emu README.vm lan.conf ipmisim1.emu $(man_MANS)
+@@ -61,6 +75,7 @@
+ EXTRA_DIST = atca.emu lan.conf ipmisim1.emu ipmisim1.sdrs \
+ 	$(man_MANS) $(IPMILAN_NOMAN) $(READMES)
  
 +if !MLX_BW_IPMID
  install-data-local:
  	$(INSTALL) -m 755 -d "$(DESTDIR)$(sysconfdir)/ipmi/"; \
--	$(INSTALL) -m 644 $(srcdir)/lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/"; 
--	$(INSTALL) -m 644 $(srcdir)/ipmisim1.emu "$(DESTDIR)$(sysconfdir)/ipmi/"; 
--
--noinst_DATA = ipmisim1.bsdr
--
--SUFFIXES = .bsdr .sdrs
--.sdrs.bsdr:
--	sdrcomp/sdrcomp_build -o $@ $<
--
--ipmisim1.bsdr: $(top_srcdir)/lanserv/ipmisim1.sdrs sdrcomp/sdrcomp_build
-+	$(INSTALL) -m 644 $(srcdir)/lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/";
-+	$(INSTALL) -m 644 $(srcdir)/ipmisim1.emu "$(DESTDIR)$(sysconfdir)/ipmi/";
- 
- uninstall-local:
- 	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/lan.conf"
- 	-rm -f "$(DESTDIR)$(sysconfdir)/ipmi/sim.emu"
+ 	$(INSTALL) -m 644 $(srcdir)/lan.conf "$(DESTDIR)$(sysconfdir)/ipmi/"; 
+@@ -80,3 +95,4 @@
  	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null
-+endif
  
--CLEANFILES = ipmisim1.bsdr
-+CLEANFILES = libIPMIlanserv.map
+ CLEANFILES = ipmisim1.bsdr
++endif
 diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
 +++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-04-18 13:28:42.729879000 -0400
@@ -911,8 +652,8 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2019-04-19 09:51:42.897095000 -0400
-@@ -0,0 +1,698 @@
++++ b/lanserv/mlxbw/mlxbw.c	2019-07-29 12:19:07.054450000 -0400
+@@ -0,0 +1,729 @@
 +/*
 + * mlxbw.c
 + *
@@ -940,8 +681,8 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +#include <OpenIPMI/ipmi_bits.h>
 +#include <OpenIPMI/ipmi_mc.h>
 +#include <OpenIPMI/serv.h>
-+#include <OpenIPMI/ipmi_mlx.h>
 +#include "../bmc.h"
++#include "../emu.h"
 +
 +static lmc_data_t *bmc_mc;
 +
@@ -1007,6 +748,37 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 + */
 +static ipmi_timer_t *reset_monitor_timer = NULL;
 +#define MLX_RESET_MONITOR_TIMEOUT         10
++
++#define MLX_EVENT_TO_SEL_BUF_SIZE           13
++#define MLX_EVENT_DIRECTION_SHIFT           7
++
++static void
++mlx_add_event_to_sel(lmc_data_t    *mc,
++           unsigned char sensor_type,
++           unsigned char sensor_num,
++           unsigned char direction,
++           unsigned char event_type,
++           unsigned char offset)
++{
++    lmc_data_t    *dest_mc;
++    unsigned char data[MLX_EVENT_TO_SEL_BUF_SIZE];
++    int           rv;
++
++    rv = ipmi_emu_get_mc_by_addr(mc->emu, mc->event_receiver, &dest_mc);
++    if (rv)
++        return;
++
++    memset(data, 0, MLX_EVENT_TO_SEL_BUF_SIZE);
++
++    data[4] = mc->ipmb;
++    data[6] = 0x04; /* Event message revision for IPMI 2.0. */
++    data[7] = sensor_type;
++    data[8] = sensor_num;
++    data[9] = (direction << MLX_EVENT_DIRECTION_SHIFT) | event_type;
++    data[10] = offset;
++
++    mc_new_event(dest_mc, 0x02, data);
++}
 +
 +/**
 + *
@@ -3899,7 +3671,7 @@ diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.s
 +fi
 diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
 --- a/sample/ipmi_serial_bmc_emu.c	2013-03-08 16:53:01.000000000 -0500
-+++ b/sample/ipmi_serial_bmc_emu.c	2019-04-18 13:28:43.102874000 -0400
++++ b/sample/ipmi_serial_bmc_emu.c	2019-07-26 10:09:39.394390000 -0400
 @@ -42,7 +42,7 @@
  #include <unistd.h>
  #include <stdlib.h>
