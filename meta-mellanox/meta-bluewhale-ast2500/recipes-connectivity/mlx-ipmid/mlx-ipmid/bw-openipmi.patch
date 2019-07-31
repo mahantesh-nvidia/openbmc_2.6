@@ -1,6 +1,6 @@
 diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
---- a/cmdlang/Makefile.am	2018-06-11 13:20:16.000000000 -0400
-+++ b/cmdlang/Makefile.am	2019-08-02 11:15:11.171739000 -0400
+--- a/cmdlang/Makefile.am	2019-08-26 15:27:41.406349000 -0400
++++ b/cmdlang/Makefile.am	2019-08-26 15:27:48.834207000 -0400
 @@ -15,8 +15,7 @@
  libOpenIPMIcmdlang_la_LIBADD = -lm \
  	$(top_builddir)/utils/libOpenIPMIutils.la \
@@ -12,8 +12,8 @@ diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
  bin_PROGRAMS = openipmish
  
 diff -ruN a/configure.ac b/configure.ac
---- a/configure.ac	2019-03-05 19:23:23.000000000 -0500
-+++ b/configure.ac	2019-08-02 11:15:11.248735000 -0400
+--- a/configure.ac	2019-08-26 15:27:41.482345000 -0400
++++ b/configure.ac	2019-08-26 15:27:48.906205000 -0400
 @@ -267,6 +267,15 @@
  )
  AC_SUBST([MARVELL_BMC_DIR])
@@ -39,8 +39,8 @@ diff -ruN a/configure.ac b/configure.ac
  	  doc/Makefile
  	  man/Makefile
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
---- a/lanserv/bmc_app.c	2017-09-18 20:27:17.000000000 -0400
-+++ b/lanserv/bmc_app.c	2019-08-02 11:15:10.742744000 -0400
+--- a/lanserv/bmc_app.c	2019-08-26 15:27:41.010359000 -0400
++++ b/lanserv/bmc_app.c	2019-08-26 15:27:48.403221000 -0400
 @@ -58,6 +58,9 @@
  #include <OpenIPMI/ipmi_mc.h>
  #include <OpenIPMI/ipmi_lan.h>
@@ -80,10 +80,282 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
      mc->watchdog_preaction_ran = 0;
  
      /* Timeout is in tenths of a second, offset is in seconds */
+diff -ruN a/lanserv/bmc.c b/lanserv/bmc.c
+--- a/lanserv/bmc.c	2019-08-26 15:27:41.108354000 -0400
++++ b/lanserv/bmc.c	2019-08-26 15:27:48.517210000 -0400
+@@ -613,6 +613,9 @@
+ 	    err = sys->lan_channel_init(sys->info, chan);
+ 	else if (chan->medium_type == IPMI_CHANNEL_MEDIUM_RS232)
+ 	    err = sys->ser_channel_init(sys->info, chan);
++	else if ((chan->medium_type == IPMI_CHANNEL_MEDIUM_IPMB) &&
++		((chan->channel_num != 0) || (chan->prim_ipmb_in_cfg_file)))
++	    err = sys->ipmb_channel_init(sys->info, chan);
+ 	else 
+ 	    chan_init(chan);
+ 	if (err) {
+@@ -802,6 +805,7 @@
+     mc->ipmb_channel.protocol_type = IPMI_CHANNEL_PROTOCOL_IPMB;
+     mc->ipmb_channel.session_support = IPMI_CHANNEL_SESSION_LESS;
+     mc->ipmb_channel.active_sessions = 0;
++    mc->ipmb_channel.prim_ipmb_in_cfg_file = 0;
+     mc->channels[0] = &mc->ipmb_channel;
+     mc->channels[0]->log = sys->clog;
+ 
+diff -ruN a/lanserv/config.c b/lanserv/config.c
+--- a/lanserv/config.c	2019-08-26 15:27:41.117350000 -0400
++++ b/lanserv/config.c	2019-08-26 15:27:48.526213000 -0400
+@@ -64,6 +64,7 @@
+ #include <OpenIPMI/serv.h>
+ #include <OpenIPMI/lanserv.h>
+ #include <OpenIPMI/serserv.h>
++#include <OpenIPMI/ipmbserv.h>
+ #include <OpenIPMI/persist.h>
+ 
+ void
+@@ -829,6 +830,8 @@
+ 	    }
+ 	} else if (strcmp(tok, "user") == 0) {
+ 	    err = get_user(&tokptr, sys, &errstr);
++	} else if (strcmp(tok, "ipmb") == 0) {
++	    err = ipmbserv_read_config(&tokptr, sys, &errstr);
+ 	} else if (strcmp(tok, "serial") == 0) {
+ 	    err = serserv_read_config(&tokptr, sys, &errstr);
+ 	} else if (strcmp(tok, "sol") == 0) {
+diff -ruN a/lanserv/ipmb_ipmi.c b/lanserv/ipmb_ipmi.c
+--- a/lanserv/ipmb_ipmi.c	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/ipmb_ipmi.c	2019-08-26 15:27:48.584209000 -0400
+@@ -0,0 +1,219 @@
++/*
++ * ipmb_ipmi.c
++ *
++ * IPMB server interface.
++ *
++ * Copyright 2019 Mellanox
++ *
++ * This software is available to you under a choice of one of two
++ * licenses.  You may choose to be licensed under the terms of the GNU
++ * Lesser General Public License (GPL) Version 2 or the modified BSD
++ * license below.  The following disclamer applies to both licenses:
++ *
++ *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
++ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
++ *  TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ *  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ * GNU Lesser General Public Licence
++ *
++ *  This program is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Lesser General Public License
++ *  as published by the Free Software Foundation; either version 2 of
++ *  the License, or (at your option) any later version.
++ *
++ *  You should have received a copy of the GNU Lesser General Public
++ *  License along with this program; if not, write to the Free
++ *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++ * Modified BSD Licence
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   1. Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *   2. Redistributions in binary form must reproduce the above
++ *      copyright notice, this list of conditions and the following
++ *      disclaimer in the documentation and/or other materials provided
++ *      with the distribution.
++ *   3. The name of the author may not be used to endorse or promote
++ *      products derived from this software without specific prior
++ *      written permission.
++ */
++
++#include <string.h>
++#include <stdlib.h>
++#include <OpenIPMI/serv.h>
++#include <OpenIPMI/ipmbserv.h>
++#include <OpenIPMI/ipmi_mc.h>
++
++#define	IPMIDEV_MAX_SIZE	15
++
++static void
++ipmb_send(msg_t *imsg, ipmbserv_data_t *ipmb)
++{
++    unsigned char msg[(IPMI_SIM_MAX_MSG_LENGTH + 7) * 3];
++    unsigned int msg_len;
++
++    msg[0] = imsg->len + 7;
++    msg[1] = imsg->rs_addr;
++    msg[2] = (imsg->netfn << 2) | imsg->rs_lun;
++    msg[3] = -ipmb_checksum(msg + 1, 2, 0);
++    msg[4] = imsg->rq_addr;
++    msg[5] = (imsg->rq_seq << 2) | imsg->rq_lun;
++    msg[6] = imsg->cmd;
++    memcpy(msg + 7, imsg->data, imsg->len);
++    msg_len = imsg->len + 7;
++    msg[msg_len] = -ipmb_checksum(msg + 4, msg_len - 4, 0);
++    msg_len++;
++
++    if (ipmb->sysinfo->debug & DEBUG_RAW_MSG)
++	debug_log_raw_msg(ipmb->sysinfo, msg, msg_len, "Raw ipmb send:");
++    ipmb->send_out(ipmb, msg, msg_len);
++}
++
++static void
++ipmb_return_rsp(channel_t *chan, msg_t *imsg, rsp_msg_t *rsp)
++{
++    ipmbserv_data_t *ipmb = chan->chan_info;
++    msg_t msg;
++
++    msg.netfn = rsp->netfn;
++    msg.cmd = rsp->cmd;
++    msg.data = rsp->data;
++    msg.len = rsp->data_len;
++    msg.rq_lun = imsg->rs_lun;
++    msg.rq_addr = imsg->rs_addr;
++    msg.rs_lun = imsg->rq_lun;
++    msg.rs_addr = imsg->rq_addr;
++    msg.rq_seq = imsg->rq_seq;
++
++    ipmb_send(&msg, ipmb);
++}
++
++int
++ipmbserv_init(ipmbserv_data_t *ipmb)
++{
++    ipmb->channel.return_rsp = ipmb_return_rsp;
++    chan_init(&ipmb->channel);
++
++    return 0;
++}
++
++void
++ipmbserv_handle_data(ipmbserv_data_t *ipmb, uint8_t *imsg, unsigned int len)
++{
++    msg_t msg;
++
++    if (len < 8) {
++	fprintf(stderr, "Message too short\n");
++	return;
++    }
++    /* subtract len field and checksum */
++    len--;
++    imsg++;
++
++    if (ipmb_checksum(imsg, len, 0) != 0) {
++	fprintf(stderr, "Message checksum failure\n");
++	return;
++    }
++    len--;
++
++    memset(&msg, 0, sizeof(msg));
++
++    msg.rs_addr = imsg[0];
++    msg.netfn = imsg[1] >> 2;
++    msg.rs_lun = imsg[1] & 3;
++    /* imsg[2] is first checksum */
++    msg.rq_addr = imsg[3];
++    msg.rq_seq = imsg[4] >> 2;
++    msg.rq_lun = imsg[4] & 3;
++    msg.cmd = imsg[5];
++
++    msg.len = len - 6;
++    msg.data = imsg + 6;
++
++    msg.src_addr = NULL;
++    msg.src_len = 0;
++
++    channel_smi_send(&ipmb->channel, &msg);
++}
++
++int
++ipmbserv_read_config(char **tokptr, sys_data_t *sys, const char **errstr)
++{
++    ipmbserv_data_t *ipmb;
++    unsigned int chan_num;
++    int err;
++    const char *tok;
++    char *ipmbdev;
++
++    err = get_uint(tokptr, &chan_num, errstr);
++    if (err)
++	return -1;
++
++    if (chan_num >= IPMI_MAX_CHANNELS) {
++	*errstr = "Invalid channel number, must be 0-15";
++	return -1;
++    }
++
++    /*
++     * Allow an IPMB channel to override the default channel 0.
++     */
++    if (chan_num != 0 && sys->chan_set[chan_num]) {
++	    *errstr = "Channel already in use";
++	    return -1;
++    }
++
++    tok = mystrtok(NULL, " \t\n", tokptr);
++    if (!tok || strcmp(tok, "ipmb_dev_int")) {
++	*errstr = "Config file missing <linux ipmb driver name>";
++	return -1;
++    }
++
++    tok = mystrtok(NULL, " \t\n", tokptr);
++    if (strlen(tok) > IPMIDEV_MAX_SIZE) {
++	*errstr = "Length of device file name %s > 15";
++	return -1;
++    }
++    ipmbdev = strdup(tok);
++    if (!ipmbdev) {
++	*errstr = "Unable to alloc device file name";
++	return -1;
++    }
++
++    ipmb = malloc(sizeof(*ipmb));
++    if (!ipmb) {
++	free(ipmbdev);
++	*errstr = "Out of memory";
++	return -1;
++    }
++    memset(ipmb, 0, sizeof(*ipmb));
++    ipmb->ipmbdev = ipmbdev;
++
++    ipmb->channel.session_support = IPMI_CHANNEL_SESSION_LESS;
++    ipmb->channel.medium_type = IPMI_CHANNEL_MEDIUM_IPMB;
++    ipmb->channel.protocol_type = IPMI_CHANNEL_PROTOCOL_IPMB;
++
++    ipmb->channel.channel_num = chan_num;
++
++    ipmb->sysinfo = sys;
++    ipmb->channel.chan_info = ipmb;
++
++    if (chan_num == 0)
++	ipmb->channel.prim_ipmb_in_cfg_file = 1;
++    else
++	ipmb->channel.prim_ipmb_in_cfg_file = 0;
++
++    sys->chan_set[chan_num] = &ipmb->channel;
++
++    return 0;
++}
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
---- a/lanserv/ipmi_sim.c	2018-12-20 15:14:45.000000000 -0500
-+++ b/lanserv/ipmi_sim.c	2019-08-02 11:15:10.873742000 -0400
-@@ -97,7 +97,13 @@
+--- a/lanserv/ipmi_sim.c	2019-08-26 15:27:41.150354000 -0400
++++ b/lanserv/ipmi_sim.c	2019-08-26 15:27:48.555211000 -0400
+@@ -90,6 +90,7 @@
+ #include <OpenIPMI/serv.h>
+ #include <OpenIPMI/lanserv.h>
+ #include <OpenIPMI/serserv.h>
++#include <OpenIPMI/ipmbserv.h>
+ 
+ #include "emu.h"
+ #include <OpenIPMI/persist.h>
+@@ -97,7 +98,13 @@
  #define MAX_ADDR 4
  
  #define BASE_CONF_STR SYSCONFDIR "/ipmi"
@@ -97,7 +369,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  static const char *statedir = STATEDIR;
  static char *command_string = NULL;
  static char *command_file = NULL;
-@@ -308,6 +314,31 @@
+@@ -308,6 +315,31 @@
      return;
  }
  
@@ -129,7 +401,116 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  static int
  open_lan_fd(struct sockaddr *addr, socklen_t addr_len)
  {
-@@ -1509,7 +1540,11 @@
+@@ -567,6 +599,100 @@
+     return err;
+ }
+ 
++static int
++ipmb_open(char *ipmi_dev)
++{
++    int ipmi_fd;
++
++    if (!ipmi_dev) {
++	fprintf(stderr, "ipmi_dev is not specified\n");
++	return -1;
++    }
++
++    ipmi_fd = open(ipmi_dev, O_RDWR);
++    if (ipmi_fd == -1)
++        fprintf(stderr, "Could not open ipmi device\n");
++
++    return ipmi_fd;
++}
++
++static void
++ipmb_data_ready(int fd, void *cb_data, os_hnd_fd_id_t *id)
++{
++    ipmbserv_data_t *ipmb = cb_data;
++    unsigned int  len;
++    unsigned char msgd[256];
++
++    len = read(fd, msgd, sizeof(msgd));
++
++    if (ipmb->sysinfo->debug & DEBUG_MSG)
++        printf(">ipmb_data_ready size %d\n", len);
++    if (len <= 0) {
++        if ((len < 0) && (errno == EINTR))
++            return;
++
++        ipmb->os_hnd->remove_fd_to_wait_for(ipmb->os_hnd, id);
++        close(fd);
++        ipmb->fd = -1;
++        return;
++    }
++
++    ipmbserv_handle_data(ipmb, msgd, len);
++}
++
++static void
++ipmb_send(ipmbserv_data_t *ipmb, unsigned char *data, unsigned int data_len)
++{
++    int rv;
++
++    if (ipmb->fd == -1)
++	/* Not connected */
++	return;
++
++    rv = write(ipmb->fd, data, data_len);
++    if (rv) {
++	/* FIXME - log an error. */
++    }
++}
++
++static int
++ipmb_channel_init(void *info, channel_t *chan)
++{
++    misc_data_t *data = info;
++    ipmbserv_data_t *ipmb = chan->chan_info;
++    int err;
++    os_hnd_fd_id_t *fd_id;
++
++    ipmb->os_hnd = data->os_hnd;
++    ipmb->user_info = data;
++    ipmb->send_out = ipmb_send;
++
++    err = ipmbserv_init(ipmb);
++    if (err) {
++        fprintf(stderr, "Unable to init ipmb: 0x%x\n", err);
++        exit(1);
++    }
++
++    ipmb->fd = ipmb_open(ipmb->ipmbdev);
++    if (ipmb->fd == -1){
++        fprintf(stderr, "Unable to open ipmi device file: 0x%x\n", err);
++        exit(1);
++    }
++
++    err = data->os_hnd->add_fd_to_wait_for(data->os_hnd, ipmb->fd,
++                                            ipmb_data_ready, ipmb,
++                                            NULL, &fd_id);
++    if (err) {
++	close(ipmb->fd);
++	ipmb->fd = -1;
++	fprintf(stderr, "Unable to open ipmi device file: 0x%x\n", err);
++	exit(1);
++    }
++
++    isim_add_fd(ipmb->fd);
++    return 0;
++}
++
+ static void
+ isim_log(sys_data_t *sys, int logtype, msg_t *msg, const char *format,
+ 	 va_list ap, int len)
+@@ -1438,6 +1564,7 @@
+     sysinfo.cfree = ifree;
+     sysinfo.lan_channel_init = lan_channel_init;
+     sysinfo.ser_channel_init = ser_channel_init;
++    sysinfo.ipmb_channel_init = ipmb_channel_init;
+     data.sys = &sysinfo;
+ 
+     err = pipe(sigpipeh);
+@@ -1509,7 +1636,11 @@
  	exit(1);
      }
  
@@ -141,7 +522,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
      if (err) {
  	fprintf(stderr, "Unable to initialize persistence: %s\n",
  		strerror(err));
-@@ -1546,7 +1581,11 @@
+@@ -1546,7 +1677,11 @@
  	strcpy(command_file, BASE_CONF_STR);
  	strcat(command_file, "/");
  	strcat(command_file, sysinfo.name);
@@ -154,9 +535,29 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  	tf = fopen(command_file, "r");
  	if (!tf) {
  	    free(command_file);
+diff -ruN a/lanserv/lan.conf b/lanserv/lan.conf
+--- a/lanserv/lan.conf	2019-08-26 15:27:41.118357000 -0400
++++ b/lanserv/lan.conf	2019-08-26 15:27:48.528211000 -0400
+@@ -126,3 +126,16 @@
+ # where initstr is the init string passed on the module load line.
+ # It should return 0 on success or an errno no failure.
+ #loadlib "/opt/lib/ipmi_sim_extend.so" "Initialization String"
++
++# "ipmb" should be added to the config file of a device
++# that needs to handle an IPMB request and generate a response
++# back to the requester.
++# In the case of an IPMB bridge request for example, the
++# BMC is considered the requester and the responder device
++# should have a config file defining the IPMB channel number.
++# For example:
++# ipmb <channel number> <linux ipmb driver name> <device file>
++# ipmb 2 ipmb_dev_int /dev/ipmb-2
++#
++# At the moment, this OpenIPMI ipmb interface works with the
++# linux driver ipmb_dev_int.c.
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
---- a/lanserv/Makefile.am	2019-07-26 11:43:20.761792000 -0400
-+++ b/lanserv/Makefile.am	2019-08-02 11:15:10.752744000 -0400
+--- a/lanserv/Makefile.am	2019-08-26 15:27:41.024356000 -0400
++++ b/lanserv/Makefile.am	2019-08-26 15:27:48.417222000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
@@ -180,11 +581,13 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
  
  noinst_PROGRAMS = ipmi_checksum
  
-@@ -35,7 +39,7 @@
+@@ -34,8 +38,8 @@
+ 
  libIPMIlanserv_la_SOURCES = lanserv_ipmi.c lanserv_asf.c priv_table.c \
  	lanserv_oem_force.c lanserv_config.c config.c serv.c serial_ipmi.c \
- 	persist.c extcmd.c
+-	persist.c extcmd.c
 -libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl $(RT_LIB)
++	persist.c extcmd.c ipmb_ipmi.c
 +libIPMIlanserv_la_LIBADD = $(OPENSSLLIBS) -ldl
  libIPMIlanserv_la_LDFLAGS = -version-info $(LD_VERSION) \
  	../utils/libOpenIPMIutils.la
@@ -234,7 +637,7 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
 +endif
 diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-08-02 11:15:10.885743000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-08-26 15:27:48.566214000 -0400
 @@ -0,0 +1,18 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -256,7 +659,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.
 +
 diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-08-02 11:15:10.883741000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-08-26 15:27:48.565207000 -0400
 @@ -0,0 +1,65 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -325,7 +728,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-h
 +SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/lancontrol	2019-08-02 11:15:10.888780000 -0400
++++ b/lanserv/mlxbw/lancontrol	2019-08-26 15:27:48.568213000 -0400
 @@ -0,0 +1,295 @@
 +#!/bin/sh
 +
@@ -624,7 +1027,7 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2019-08-02 11:15:10.890749000 -0400
++++ b/lanserv/mlxbw/Makefile.am	2019-08-26 15:27:48.570207000 -0400
 @@ -0,0 +1,24 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
@@ -652,7 +1055,7 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2019-08-02 11:15:10.893742000 -0400
++++ b/lanserv/mlxbw/mlxbw.c	2019-08-26 15:27:48.571212000 -0400
 @@ -0,0 +1,729 @@
 +/*
 + * mlxbw.c
@@ -1385,7 +1788,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +}
 diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 --- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.hw	2019-08-02 11:15:10.895747000 -0400
++++ b/lanserv/mlxbw/mlxbw.hw	2019-08-26 15:27:48.573210000 -0400
 @@ -0,0 +1,204 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -1593,7 +1996,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +mc_enable 0x20
 diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 --- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-08-02 11:15:10.898740000 -0400
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-08-26 15:27:48.574216000 -0400
 @@ -0,0 +1,376 @@
 +#!/bin/bash
 +
@@ -1973,8 +2376,8 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-08-02 11:15:10.900743000 -0400
-@@ -0,0 +1,77 @@
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-08-26 15:27:48.576216000 -0400
+@@ -0,0 +1,81 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
 +# Copyright (c) 2018 Diane Lynch <dianel@mellanox.com>
@@ -2043,6 +2446,10 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +
 +  sol "/dev/ttyS0" 115200 nortscts history=65530 historyfru=10
 +
++  # ipmb is only enabled when the ipmb_dev_int driver is loaded
++  # by the obmc-mellanox-ipmbd.sh script
++#  ipmb 12 ipmb_dev_int /dev/ipmb-12
++
 +#  serial bt localhost 9012 codec BT_Mode
 +
 +# Dynamically load a module to extend the simulator.  After the module is
@@ -2054,7 +2461,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2019-08-08 13:47:37.774083000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2019-08-26 15:27:48.579207000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -3611,7 +4018,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2019-08-08 13:54:17.609279000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2019-08-26 15:27:48.580214000 -0400
 @@ -0,0 +1,31 @@
 +last_add_time:i:1565286838
 +30:d:\1e\00Q\01= \00\1f\07\1b\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
@@ -3646,7 +4053,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
 diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
 --- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-08-02 11:15:10.906747000 -0400
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-08-26 15:27:48.582213000 -0400
 @@ -0,0 +1,21 @@
 +#!/bin/bash
 +
@@ -3669,9 +4076,153 @@ diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.s
 +else
 +        sed -i'' "s/^sel_enable \([0-9x]*\) [^ ]* \([0-9x]*\)/sel_enable \1 $H_SIZE \2/g" /etc/ipmi/mlxbw.hw
 +fi
+diff -ruN a/lanserv/OpenIPMI/ipmbserv.h b/lanserv/OpenIPMI/ipmbserv.h
+--- a/lanserv/OpenIPMI/ipmbserv.h	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/OpenIPMI/ipmbserv.h	2019-08-26 15:27:48.499214000 -0400
+@@ -0,0 +1,83 @@
++/*
++ * ipmbserv.h
++ *
++ * IPMB server include file
++ *
++ * Copyright 2019 Mellanox
++ *
++ * This software is available to you under a choice of one of two
++ * licenses.  You may choose to be licensed under the terms of the GNU
++ * Lesser General Public License (GPL) Version 2 or the modified BSD
++ * license below.  The following disclamer applies to both licenses:
++ *
++ *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
++ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ *  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
++ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
++ *  OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ *  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
++ *  TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
++ *  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ * GNU Lesser General Public Licence
++ *
++ *  This program is free software; you can redistribute it and/or
++ *  modify it under the terms of the GNU Lesser General Public License
++ *  as published by the Free Software Foundation; either version 2 of
++ *  the License, or (at your option) any later version.
++ *
++ *  You should have received a copy of the GNU Lesser General Public
++ *  License along with this program; if not, write to the Free
++ *  Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ *
++ * Modified BSD Licence
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   1. Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *   2. Redistributions in binary form must reproduce the above
++ *      copyright notice, this list of conditions and the following
++ *      disclaimer in the documentation and/or other materials provided
++ *      with the distribution.
++ *   3. The name of the author may not be used to endorse or promote
++ *      products derived from this software without specific prior
++ *      written permission.
++ */
++
++#ifndef __IPMBSERV_H
++#define __IPMBSERV_H
++
++#include <OpenIPMI/serv.h>
++#include <OpenIPMI/os_handler.h>
++
++typedef struct ipmbserv_data_s ipmbserv_data_t;
++
++struct ipmbserv_data_s {
++    lan_addr_t addr;
++
++    channel_t channel;
++
++    os_handler_t *os_hnd;
++
++    sys_data_t *sysinfo;
++
++    void *user_info;
++
++    int fd;
++
++    void (*send_out)(ipmbserv_data_t *si, unsigned char *data,
++		     unsigned int data_len);
++
++    char *ipmbdev;
++};
++
++int ipmbserv_read_config(char **tokptr, sys_data_t *sys, const char **errstr);
++int ipmbserv_init(ipmbserv_data_t *ipmb);
++void ipmbserv_handle_data(ipmbserv_data_t *ipmb, uint8_t *imsg, unsigned int len);
++
++#endif /* __IPMBSERV_H */
+diff -ruN a/lanserv/OpenIPMI/Makefile.am b/lanserv/OpenIPMI/Makefile.am
+--- a/lanserv/OpenIPMI/Makefile.am	2019-08-26 15:27:41.077354000 -0400
++++ b/lanserv/OpenIPMI/Makefile.am	2019-08-26 15:27:48.481215000 -0400
+@@ -1,3 +1,3 @@
+ 
+ pkginclude_HEADERS = lanserv.h serserv.h serv.h extcmd.h persist.h msg.h \
+-	mcserv.h
++	mcserv.h ipmbserv.h
+diff -ruN a/lanserv/OpenIPMI/serv.h b/lanserv/OpenIPMI/serv.h
+--- a/lanserv/OpenIPMI/serv.h	2019-08-26 15:27:41.086353000 -0400
++++ b/lanserv/OpenIPMI/serv.h	2019-08-26 15:27:48.491222000 -0400
+@@ -219,6 +219,9 @@
+      */
+     int (*oem_intf_recv_handler)(channel_t *chan, msg_t *msg,
+ 				 unsigned char *rdata, unsigned int *rdata_len);
++
++    /* Set to 1 if ipmb channel 0 is listed in the config file, 0 otherwise */
++    int prim_ipmb_in_cfg_file;
+ };
+ 
+ struct user_s
+@@ -408,6 +411,7 @@
+     void (*cfree)(channel_t *chan, void *data);
+     int (*lan_channel_init)(void *info, channel_t *chan);
+     int (*ser_channel_init)(void *info, channel_t *chan);
++    int (*ipmb_channel_init)(void *info, channel_t *chan);
+ };
+ 
+ static inline void
+diff -ruN a/lanserv/README.design b/lanserv/README.design
+--- a/lanserv/README.design	2019-08-26 15:27:41.017355000 -0400
++++ b/lanserv/README.design	2019-08-26 15:27:48.410227000 -0400
+@@ -31,6 +31,8 @@
+ 
+ serserv.h - The configuration of a serial interface.
+ 
++ipmbserv.h - The configuration of an IPMB interface.
++
+ serv.h - This defines data structures used by the whole system.
+ 
+ 
+@@ -77,6 +79,8 @@
+ extcmd.c - Code for running the external command for dealing with LAN
+ 	configuration.
+ 
++ipmb_ipmi.c - An implementation of the IPMB protocol.
++
+ ipmi_sim.c - The main file for the ipmi_sim program.
+ 
+ lanserv_asf.c - Handles LAN ASF commands.
+@@ -179,4 +183,4 @@
+ It installs a hook into lanserv_ipmi.c to receive the SOL payload and
+ send the SOL payload.
+ 
+-It ties into bmc.c to handle SOL-specific commands.
+\ No newline at end of file
++It ties into bmc.c to handle SOL-specific commands.
 diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
---- a/sample/ipmi_serial_bmc_emu.c	2013-03-08 16:53:01.000000000 -0500
-+++ b/sample/ipmi_serial_bmc_emu.c	2019-08-02 11:15:11.134739000 -0400
+--- a/sample/ipmi_serial_bmc_emu.c	2019-08-26 15:27:41.372347000 -0400
++++ b/sample/ipmi_serial_bmc_emu.c	2019-08-26 15:27:48.800206000 -0400
 @@ -42,7 +42,7 @@
  #include <unistd.h>
  #include <stdlib.h>
@@ -3682,8 +4233,8 @@ diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
  #define _GNU_SOURCE
  #include <getopt.h>
 diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
---- a/tcl/Makefile.am	2018-12-13 21:08:29.000000000 -0500
-+++ b/tcl/Makefile.am	2019-08-02 11:15:11.270739000 -0400
+--- a/tcl/Makefile.am	2019-08-26 15:27:41.501345000 -0400
++++ b/tcl/Makefile.am	2019-08-26 15:27:48.925203000 -0400
 @@ -11,7 +11,7 @@
  libOpenIPMItcl_la_CFLAGS = $(AM_CFLAGS)
  libOpenIPMItcl_la_LIBADD = $(GDBM_LIB)
@@ -3694,8 +4245,8 @@ diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
  noinst_PROGRAMS = test_handlers
  
 diff -ruN a/unix/Makefile.am b/unix/Makefile.am
---- a/unix/Makefile.am	2017-07-26 22:19:06.000000000 -0400
-+++ b/unix/Makefile.am	2019-08-02 11:15:11.466734000 -0400
+--- a/unix/Makefile.am	2019-08-26 15:27:41.681342000 -0400
++++ b/unix/Makefile.am	2019-08-26 15:27:49.109199000 -0400
 @@ -10,24 +10,10 @@
  libOpenIPMIpthread_la_SOURCES = posix_thread_os_hnd.c selector.c
  libOpenIPMIpthread_la_LIBADD = -lpthread $(GDBM_LIB) \
