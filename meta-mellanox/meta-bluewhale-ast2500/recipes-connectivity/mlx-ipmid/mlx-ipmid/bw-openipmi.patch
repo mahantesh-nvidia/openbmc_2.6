@@ -1,6 +1,6 @@
 diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
 --- a/cmdlang/Makefile.am	2018-06-11 13:20:16.000000000 -0400
-+++ b/cmdlang/Makefile.am	2019-07-26 11:54:24.191390000 -0400
++++ b/cmdlang/Makefile.am	2019-08-02 11:15:11.171739000 -0400
 @@ -15,8 +15,7 @@
  libOpenIPMIcmdlang_la_LIBADD = -lm \
  	$(top_builddir)/utils/libOpenIPMIutils.la \
@@ -13,7 +13,7 @@ diff -ruN a/cmdlang/Makefile.am b/cmdlang/Makefile.am
  
 diff -ruN a/configure.ac b/configure.ac
 --- a/configure.ac	2019-03-05 19:23:23.000000000 -0500
-+++ b/configure.ac	2019-04-18 13:28:42.589881000 -0400
++++ b/configure.ac	2019-08-02 11:15:11.248735000 -0400
 @@ -267,6 +267,15 @@
  )
  AC_SUBST([MARVELL_BMC_DIR])
@@ -40,7 +40,7 @@ diff -ruN a/configure.ac b/configure.ac
  	  man/Makefile
 diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
 --- a/lanserv/bmc_app.c	2017-09-18 20:27:17.000000000 -0400
-+++ b/lanserv/bmc_app.c	2019-07-26 12:59:24.255604000 -0400
++++ b/lanserv/bmc_app.c	2019-08-02 11:15:10.742744000 -0400
 @@ -58,6 +58,9 @@
  #include <OpenIPMI/ipmi_mc.h>
  #include <OpenIPMI/ipmi_lan.h>
@@ -82,7 +82,7 @@ diff -ruN a/lanserv/bmc_app.c b/lanserv/bmc_app.c
      /* Timeout is in tenths of a second, offset is in seconds */
 diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
 --- a/lanserv/ipmi_sim.c	2018-12-20 15:14:45.000000000 -0500
-+++ b/lanserv/ipmi_sim.c	2019-07-26 11:03:39.721847000 -0400
++++ b/lanserv/ipmi_sim.c	2019-08-02 11:15:10.873742000 -0400
 @@ -97,7 +97,13 @@
  #define MAX_ADDR 4
  
@@ -156,7 +156,7 @@ diff -ruN a/lanserv/ipmi_sim.c b/lanserv/ipmi_sim.c
  	    free(command_file);
 diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
 --- a/lanserv/Makefile.am	2019-07-26 11:43:20.761792000 -0400
-+++ b/lanserv/Makefile.am	2019-07-26 11:08:47.497992000 -0400
++++ b/lanserv/Makefile.am	2019-08-02 11:15:10.752744000 -0400
 @@ -6,8 +6,8 @@
  
  BUILD_CC = @BUILD_CC@
@@ -234,7 +234,7 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
 +endif
 diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-04-18 13:28:42.729879000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-08-02 11:15:10.885743000 -0400
 @@ -0,0 +1,18 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -256,7 +256,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.
 +
 diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
 --- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-04-18 13:28:42.759879000 -0400
++++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-08-02 11:15:10.883741000 -0400
 @@ -0,0 +1,65 @@
 +########################################################################
 +# Copyright (c) 2019 Mellanox Technologies.
@@ -325,7 +325,7 @@ diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-h
 +SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/lancontrol	2019-04-18 13:28:42.786887000 -0400
++++ b/lanserv/mlxbw/lancontrol	2019-08-02 11:15:10.888780000 -0400
 @@ -0,0 +1,295 @@
 +#!/bin/sh
 +
@@ -624,7 +624,7 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2019-04-18 13:28:42.815878000 -0400
++++ b/lanserv/mlxbw/Makefile.am	2019-08-02 11:15:10.890749000 -0400
 @@ -0,0 +1,24 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
@@ -652,7 +652,7 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	-rmdir "$(DESTDIR)$(sysconfdir)/ipmi" 2>/dev/null"
 diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 --- a/lanserv/mlxbw/mlxbw.c	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.c	2019-07-29 12:19:07.054450000 -0400
++++ b/lanserv/mlxbw/mlxbw.c	2019-08-02 11:15:10.893742000 -0400
 @@ -0,0 +1,729 @@
 +/*
 + * mlxbw.c
@@ -1385,7 +1385,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.c b/lanserv/mlxbw/mlxbw.c
 +}
 diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 --- a/lanserv/mlxbw/mlxbw.hw	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.hw	2019-04-18 13:28:42.878876000 -0400
++++ b/lanserv/mlxbw/mlxbw.hw	2019-08-02 11:15:10.895747000 -0400
 @@ -0,0 +1,204 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -1593,7 +1593,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.hw b/lanserv/mlxbw/mlxbw.hw
 +mc_enable 0x20
 diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 --- a/lanserv/mlxbw/mlxbw-hw-events.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-04-18 13:28:42.912874000 -0400
++++ b/lanserv/mlxbw/mlxbw-hw-events.sh	2019-08-02 11:15:10.898740000 -0400
 @@ -0,0 +1,376 @@
 +#!/bin/bash
 +
@@ -1973,7 +1973,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-04-18 13:28:42.944877000 -0400
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-08-02 11:15:10.900743000 -0400
 @@ -0,0 +1,77 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -2054,7 +2054,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2019-04-18 13:28:42.982874000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2019-08-08 13:47:37.774083000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -2400,7 +2400,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            160
 +        entity_id                system_board
-+        entity_instance          1
++        entity_instance          4
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2451,7 +2451,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            161
 +        entity_id                system_board
-+        entity_instance          2
++        entity_instance          5
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2502,7 +2502,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            162
 +        entity_id                system_board
-+        entity_instance          3
++        entity_instance          6
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2553,7 +2553,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            163
 +        entity_id                system_board
-+        entity_instance          4
++        entity_instance          7
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2604,7 +2604,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            164
 +        entity_id                system_board
-+        entity_instance          5
++        entity_instance          8
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2655,7 +2655,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            165
 +        entity_id                system_board
-+        entity_instance          6
++        entity_instance          9
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2706,7 +2706,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            166
 +        entity_id                system_board
-+        entity_instance          7
++        entity_instance          10
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2757,7 +2757,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            167
 +        entity_id                system_board
-+        entity_instance          8
++        entity_instance          11
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2808,7 +2808,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            168
 +        entity_id                system_board
-+        entity_instance          9
++        entity_instance          12
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2859,7 +2859,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            169
 +        entity_id                system_board
-+        entity_instance          10
++        entity_instance          13
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2910,7 +2910,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            170
 +        entity_id                system_board
-+        entity_instance          11
++        entity_instance          14
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -2961,7 +2961,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            171
 +        entity_id                system_board
-+        entity_instance          12
++        entity_instance          15
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3013,7 +3013,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            172
 +        entity_id                system_board
-+        entity_instance          13
++        entity_instance          16
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3065,7 +3065,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            173
 +        entity_id                system_board
-+        entity_instance          14
++        entity_instance          17
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3116,7 +3116,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            174
 +        entity_id                system_board
-+        entity_instance          15
++        entity_instance          18
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3167,7 +3167,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            175
 +        entity_id                system_board
-+        entity_instance          16
++        entity_instance          19
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3218,7 +3218,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            176
 +        entity_id                system_board
-+        entity_instance          17
++        entity_instance          20
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3269,7 +3269,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            177
 +        entity_id                system_board
-+        entity_instance          18
++        entity_instance          21
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3320,7 +3320,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            178
 +        entity_id                system_board
-+        entity_instance          19
++        entity_instance          22
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3371,7 +3371,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            179
 +        entity_id                system_board
-+        entity_instance          20
++        entity_instance          23
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3422,7 +3422,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            180
 +        entity_id                system_board
-+        entity_instance          21
++        entity_instance          24
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3473,7 +3473,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            181
 +        entity_id                system_board
-+        entity_instance          22
++        entity_instance          25
 +        sensor_type              Voltage
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3527,7 +3527,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            30
 +        entity_id                system_board
-+        entity_instance          23
++        entity_instance          26
 +        sensor_type              Current
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3572,7 +3572,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        channel_number           0
 +        sensor_number            31
 +        entity_id                system_board
-+        entity_instance          24
++        entity_instance          27
 +        sensor_type              Current
 +        event_reading_type_code  1
 +        sensor_event_msg_ctrl    per_state
@@ -3611,33 +3611,33 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2019-04-18 13:28:43.014886000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2019-08-08 13:54:17.609279000 -0400
 @@ -0,0 +1,31 @@
-+last_add_time:i:1549654305
-+30:d:\1e\00Q\01= \00\1f\07\18\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
-+29:d:\1d\00Q\018 \00\1e\07\17\7fH\03\01\00\02\00"\10\10\00\05\00\00,@\00\01\01\c0\01\93\00\00\00\00\00\ad\00\00\00\00\02\02\00\00\00\cdvr_vcore_iout
-+28:d:\1c\00Q\019 \00\b5\07\16\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cebf_vccinp_3p3v
-+27:d:\1b\00Q\017 \00\b4\07\15\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccbf_vcca_3p3v
-+26:d:\1a\00Q\019 \00\b3\07\14\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00S\00\00J\00\02\02\00\00\00\cebf_serdes_1p2v
-+25:d:\19\00Q\016 \00\b2\07\13\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00Z\00\00@\00\02\02\00\00\00\cbbf_ddr_1p2v
-+24:d:\18\00Q\017 \00\b1\07\12\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01q\00\00\00\00\00|\00\00e\00\02\02\00\00\00\ccbf_vddo_1p8v
-+23:d:\17\00Q\017 \00\b0\07\11\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr1_2p5v
-+22:d:\16\00Q\017 \00\af\07\10\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr0_2p5v
-+21:d:\15\00Q\015 \00\ae\07\0f\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cabf_io_3p3v
-+20:d:\14\00Q\019 \00\ad\07\0e\7fH\02\01\04"\04"\12\12\00\04\00\00\f4@\00\01\01\c0\01\12\00\00\00\00\00\14\00\00\10\00\02\02\00\00\00\cebf_vcore_0p95v
-+19:d:\13\00Q\019 \00\ac\07\0d\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cemb_vccinp_3p3v
-+18:d:\12\00Q\017 \00\ab\07\0c\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_vcca_3p3v
-+17:d:\11\00Q\017 \00\aa\07\0b\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci1_3p3v
-+16:d:\10\00Q\016 \00\a9\07\0a\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci1_12v
-+15:d:\0f\00Q\017 \00\a8\07\09\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci0_3p3v
-+14:d:\0e\00Q\016 \00\a7\07\08\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci0_12v
-+13:d:\0d\00Q\015 \00\a6\07\07\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_atx_12v
-+12:d:\0c\00Q\014 \00\a5\07\06\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\c9mb_5v_aux
-+11:d:\0b\00Q\015 \00\a4\07\05\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_5v_stby
-+10:d:\0a\00Q\012 \00\a3\07\04\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\c7mb_3p3v
-+9:d:\09\00Q\017 \00\a2\07\03\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_3p3v_stby
-+8:d:\08\00Q\016 \00\a1\07\02\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cbmb_3p3v_aux
-+7:d:\07\00Q\011 \00\a0\07\01\7fH\02\01\04"\04"\12\12\00\04\00\00d\00\00\01\01\d0\01x\00\00\00\00\00\80\00\00s\00\03\03\00\00\00\c6vr_vin
++last_add_time:i:1565286838
++30:d:\1e\00Q\01= \00\1f\07\1b\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
++29:d:\1d\00Q\018 \00\1e\07\1a\7fH\03\01\00\02\00"\10\10\00\05\00\00,@\00\01\01\c0\01\93\00\00\00\00\00\ad\00\00\00\00\02\02\00\00\00\cdvr_vcore_iout
++28:d:\1c\00Q\019 \00\b5\07\19\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cebf_vccinp_3p3v
++27:d:\1b\00Q\017 \00\b4\07\18\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccbf_vcca_3p3v
++26:d:\1a\00Q\019 \00\b3\07\17\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00S\00\00J\00\02\02\00\00\00\cebf_serdes_1p2v
++25:d:\19\00Q\016 \00\b2\07\16\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01K\00\00\00\00\00Z\00\00@\00\02\02\00\00\00\cbbf_ddr_1p2v
++24:d:\18\00Q\017 \00\b1\07\15\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01q\00\00\00\00\00|\00\00e\00\02\02\00\00\00\ccbf_vddo_1p8v
++23:d:\17\00Q\017 \00\b0\07\14\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr1_2p5v
++22:d:\16\00Q\017 \00\af\07\13\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\9c\00\00\00\00\00\ac\00\00\8d\00\02\02\00\00\00\ccbf_ddr0_2p5v
++21:d:\15\00Q\015 \00\ae\07\12\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cabf_io_3p3v
++20:d:\14\00Q\019 \00\ad\07\11\7fH\02\01\04"\04"\12\12\00\04\00\00\f4@\00\01\01\c0\01\12\00\00\00\00\00\14\00\00\10\00\02\02\00\00\00\cebf_vcore_0p95v
++19:d:\13\00Q\019 \00\ac\07\10\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cemb_vccinp_3p3v
++18:d:\12\00Q\017 \00\ab\07\0f\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_vcca_3p3v
++17:d:\11\00Q\017 \00\aa\07\0e\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci1_3p3v
++16:d:\10\00Q\016 \00\a9\07\0d\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci1_12v
++15:d:\0f\00Q\017 \00\a8\07\0c\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_pci0_3p3v
++14:d:\0e\00Q\016 \00\a7\07\0b\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\cbmb_pci0_12v
++13:d:\0d\00Q\015 \00\a6\07\0a\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_atx_12v
++12:d:\0c\00Q\014 \00\a5\07\09\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\c9mb_5v_aux
++11:d:\0b\00Q\015 \00\a4\07\08\7fH\02\01\04"\04"\12\12\00\04\00\00,@\00\01\01\c0\01\a7\00\00\00\00\00\af\00\00\9e\00\02\02\00\00\00\camb_5v_stby
++10:d:\0a\00Q\012 \00\a3\07\07\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\c7mb_3p3v
++9:d:\09\00Q\017 \00\a2\07\06\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccmb_3p3v_stby
++8:d:\08\00Q\016 \00\a1\07\05\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cbmb_3p3v_aux
++7:d:\07\00Q\011 \00\a0\07\04\7fH\02\01\04"\04"\12\12\00\04\00\00d\00\00\01\01\d0\01x\00\00\00\00\00\80\00\00s\00\03\03\00\00\00\c6vr_vin
 +6:d:\06\00Q\013 \00r\1d\03\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan3_rpm
 +5:d:\05\00Q\013 \00q\1d\02\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan2_rpm
 +4:d:\04\00Q\013 \00p\1d\01\7fH\04\01\04 \04\00\02\00\00\12\00\00d\00\00\05\00\00\01n\00\00\00\00\00\00\00\00\05\00\02\02\00\00\00\c8fan1_rpm
@@ -3646,7 +3646,7 @@ diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 +1:d:\01\00Q\018 \00\01\07\01\7fH\01\01\852\852\1b\1b\00\01\00\00\01\00\80\c0\01\00\01\9f\00\00\80\00\00\b2\ad\00\8a\8f\01\01\00\00\00\cdbf_inlet_temp
 diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.sh
 --- a/lanserv/mlxbw/sel_set_log_size.sh	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-04-18 13:28:43.047895000 -0400
++++ b/lanserv/mlxbw/sel_set_log_size.sh	2019-08-02 11:15:10.906747000 -0400
 @@ -0,0 +1,21 @@
 +#!/bin/bash
 +
@@ -3671,7 +3671,7 @@ diff -ruN a/lanserv/mlxbw/sel_set_log_size.sh b/lanserv/mlxbw/sel_set_log_size.s
 +fi
 diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
 --- a/sample/ipmi_serial_bmc_emu.c	2013-03-08 16:53:01.000000000 -0500
-+++ b/sample/ipmi_serial_bmc_emu.c	2019-07-26 10:09:39.394390000 -0400
++++ b/sample/ipmi_serial_bmc_emu.c	2019-08-02 11:15:11.134739000 -0400
 @@ -42,7 +42,7 @@
  #include <unistd.h>
  #include <stdlib.h>
@@ -3683,7 +3683,7 @@ diff -ruN a/sample/ipmi_serial_bmc_emu.c b/sample/ipmi_serial_bmc_emu.c
  #include <getopt.h>
 diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
 --- a/tcl/Makefile.am	2018-12-13 21:08:29.000000000 -0500
-+++ b/tcl/Makefile.am	2019-04-18 13:28:43.164870000 -0400
++++ b/tcl/Makefile.am	2019-08-02 11:15:11.270739000 -0400
 @@ -11,7 +11,7 @@
  libOpenIPMItcl_la_CFLAGS = $(AM_CFLAGS)
  libOpenIPMItcl_la_LIBADD = $(GDBM_LIB)
@@ -3695,7 +3695,7 @@ diff -ruN a/tcl/Makefile.am b/tcl/Makefile.am
  
 diff -ruN a/unix/Makefile.am b/unix/Makefile.am
 --- a/unix/Makefile.am	2017-07-26 22:19:06.000000000 -0400
-+++ b/unix/Makefile.am	2019-04-18 13:28:43.180888000 -0400
++++ b/unix/Makefile.am	2019-08-02 11:15:11.466734000 -0400
 @@ -10,24 +10,10 @@
  libOpenIPMIpthread_la_SOURCES = posix_thread_os_hnd.c selector.c
  libOpenIPMIpthread_la_LIBADD = -lpthread $(GDBM_LIB) \
