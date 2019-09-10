@@ -2461,7 +2461,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +loadlib "/usr/lib/mlx_ipmid/mlxbw.so" ""
 diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 --- a/lanserv/mlxbw/mlxbw.sdr	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.sdr	2019-08-26 15:27:48.579207000 -0400
++++ b/lanserv/mlxbw/mlxbw.sdr	2019-09-10 15:42:27.004831000 -0400
 @@ -0,0 +1,1553 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -4014,14 +4014,14 @@ diff -ruN a/lanserv/mlxbw/mlxbw.sdr b/lanserv/mlxbw/mlxbw.sdr
 +        analog_data_format       unsigned
 +        linearization            linear
 +        sensor_direction         input
-+        id_string                "vr_bfddr_1p2v_iout"
++        id_string                "bfddr_1p2v_iout"
 +endsdr
 diff -ruN a/lanserv/mlxbw/sdr.20.main b/lanserv/mlxbw/sdr.20.main
 --- a/lanserv/mlxbw/sdr.20.main	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/sdr.20.main	2019-08-26 15:27:48.580214000 -0400
++++ b/lanserv/mlxbw/sdr.20.main	2019-09-10 15:47:25.257014000 -0400
 @@ -0,0 +1,31 @@
-+last_add_time:i:1565286838
-+30:d:\1e\00Q\01= \00\1f\07\1b\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\d2vr_bfddr_1p2v_iout
++last_add_time:i:1568144766
++30:d:\1e\00Q\01: \00\1f\07\1b\7fH\03\01\00\02\00"\10\10\00\05\00\00\c8\00\00\01\01\c0\01d\00\00\00\00\00\af\00\00\00\00\02\02\00\00\00\cfbfddr_1p2v_iout
 +29:d:\1d\00Q\018 \00\1e\07\1a\7fH\03\01\00\02\00"\10\10\00\05\00\00,@\00\01\01\c0\01\93\00\00\00\00\00\ad\00\00\00\00\02\02\00\00\00\cdvr_vcore_iout
 +28:d:\1c\00Q\019 \00\b5\07\19\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\cebf_vccinp_3p3v
 +27:d:\1b\00Q\017 \00\b4\07\18\7fH\02\01\04"\04"\12\12\00\04\00\00\a0\00\00\01\01\c0\01\ce\00\00\00\00\00\d9\00\00\c4\00\02\02\00\00\00\ccbf_vcca_3p3v
