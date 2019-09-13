@@ -10,6 +10,7 @@ OBMC_IMAGE_EXTRA_INSTALL_append = " tcpdump \
                                     bridge-utils \
                                     strace \
                                     obmc-mellanox-mac-syncd \
+                                    screen \
                                     "
 
 # Directory holding recipe-specific files
