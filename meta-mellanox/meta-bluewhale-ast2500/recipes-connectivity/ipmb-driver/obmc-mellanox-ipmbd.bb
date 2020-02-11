@@ -10,13 +10,12 @@ inherit autotools
 
 DEPENDS += "systemd"
 S = "${WORKDIR}"
-SRC_URI += "file://obmc-mellanox-ipmbd.sh \
-           file://obmc-mellanox-ipmbd.service \
-           file://load_bf2bmc_ipmb.sh \
-           file://load_bmc2bf_ipmb.sh \
+SRC_URI += "file://obmc-mellanox-ipmb-host.sh \
+           file://obmc-mellanox-ipmb-dev-int.sh \
+           file://obmc-mellanox-ipmb-host.service \
            "
 
-SYSTEMD_SERVICE_${PN} += "obmc-mellanox-ipmbd.service"
+SYSTEMD_SERVICE_${PN} += "obmc-mellanox-ipmb-host.service"
 
 RRECOMMENDS_${PN} += "obmc-targets"
 
@@ -24,7 +23,6 @@ do_compile[noexec] = "1"
 
 do_install() {
         install -d ${D}/${sbindir}
-        install -m 755 ${S}/obmc-mellanox-ipmbd.sh ${D}/${sbindir}/obmc-mellanox-ipmbd.sh
-        install -m 755 ${S}/load_bf2bmc_ipmb.sh ${D}/${sbindir}/load_bf2bmc_ipmb.sh
-        install -m 755 ${S}/load_bmc2bf_ipmb.sh ${D}/${sbindir}/load_bmc2bf_ipmb.sh
+        install -m 755 ${S}/obmc-mellanox-ipmb-host.sh ${D}/${sbindir}/obmc-mellanox-ipmb-host.sh
+        install -m 755 ${S}/obmc-mellanox-ipmb-dev-int.sh ${D}/${sbindir}/obmc-mellanox-ipmb-dev-int.sh
 }

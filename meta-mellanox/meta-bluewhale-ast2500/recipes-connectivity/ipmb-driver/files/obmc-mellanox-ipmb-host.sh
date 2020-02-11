@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# Date modified: 08/26/2019
+# Date modified: 02/18/2020
 
-# This script checks if the IPMB driver is not yet loaded and
+# This script checks if the ipmb_host driver loaded and
 # if the BF is up via the BMC GPIO pins 218.
-# If the check is true, then we try to load the IPMB module.
+# If the check is true, then we try to load the ipmb_host module.
 I2C12_DEV_PATH=/sys/bus/i2c/devices/i2c-12/new_device
 I2C12_DEL_DEV_PATH=/sys/bus/i2c/devices/i2c-12/delete_device
 IPMB_HOST_ADD=0x1020

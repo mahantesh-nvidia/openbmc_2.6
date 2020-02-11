@@ -2376,7 +2376,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw-hw-events.sh b/lanserv/mlxbw/mlxbw-hw-events.sh
 +fi
 diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 --- a/lanserv/mlxbw/mlxbw.lan.conf	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/mlxbw.lan.conf	2019-08-26 15:27:48.576216000 -0400
++++ b/lanserv/mlxbw/mlxbw.lan.conf	2020-02-18 14:51:20.272640000 -0500
 @@ -0,0 +1,81 @@
 +########################################################################
 +# Copyright (c) 2018 Mellanox Technologies.
@@ -2448,7 +2448,7 @@ diff -ruN a/lanserv/mlxbw/mlxbw.lan.conf b/lanserv/mlxbw/mlxbw.lan.conf
 +
 +  # ipmb is only enabled when the ipmb_dev_int driver is loaded
 +  # by the obmc-mellanox-ipmbd.sh script
-+#  ipmb 12 ipmb_dev_int /dev/ipmb-12
++  ipmb 12 ipmb_dev_int /dev/ipmb-12
 +
 +#  serial bt localhost 9012 codec BT_Mode
 +

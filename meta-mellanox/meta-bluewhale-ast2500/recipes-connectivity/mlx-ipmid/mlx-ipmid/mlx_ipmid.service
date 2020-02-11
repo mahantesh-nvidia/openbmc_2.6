@@ -5,6 +5,7 @@ Description=mlx_ipmid
 Restart=always
 OOMScoreAdjust=-1000
 
+ExecStartPre=/usr/sbin/obmc-mellanox-ipmb-dev-int.sh
 ExecStart=/usr/bin/mlx_ipmid -n
 TimeoutSec=120
 
