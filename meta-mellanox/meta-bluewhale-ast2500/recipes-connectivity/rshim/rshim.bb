@@ -22,10 +22,10 @@ PARALLEL_MAKEINST = ""
 
 SYSTEMD_PACKAGES = "${PN}"
 
-SYSTEMD_SERVICE_${PN} = " bfrshim.service"
+SYSTEMD_SERVICE_${PN} = " rshim.service"
 
 do_install_append() {
     install -d ${D}/${systemd_unitdir}/system
-    install -m 644 ${WORKDIR}/git/bfrshim.service \
+    install -m 644 ${WORKDIR}/git/rshim.service \
         ${D}/${systemd_unitdir}/system/
 }
