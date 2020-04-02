@@ -635,97 +635,87 @@ diff -ruN a/lanserv/Makefile.am b/lanserv/Makefile.am
  
  CLEANFILES = ipmisim1.bsdr
 +endif
-diff -ruN a/lanserv/mlxbw/71-mlxbw-events.rules b/lanserv/mlxbw/71-mlxbw-events.rules
---- a/lanserv/mlxbw/71-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-events.rules	2019-08-26 15:27:48.566214000 -0400
-@@ -0,0 +1,18 @@
+diff -ruN a/lanserv/mlxbw/10-mlxbw-events.rules b/lanserv/mlxbw/10-mlxbw-events.rules
+--- a/lanserv/mlxbw/10-mlxbw-events.rules	1969-12-31 19:00:00.000000000 -0500
++++ b/lanserv/mlxbw/10-mlxbw-events.rules	2020-05-08 09:43:53.703809000 -0400
+@@ -0,0 +1,77 @@
 +########################################################################
-+# Copyright (c) 2019 Mellanox Technologies.
-+# Copyright (c) 2019 Diane Lynch dianel@mellanox.com>
++# SPDX-License-Identifier: GPL-2.0+
 +#
-+# Licensed under the GNU General Public License Version 2
++# Copyright (c) 2020 Mellanox Technologies.
++# Copyright (c) 2020 Diane Lynch <dianel@mellanox.com>
 +#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 2 of the License, or
-+# (at your option) any later version.
-+#
-+
-+
++# Fru data
 +SUBSYSTEM=="i2c", KERNEL=="6-0050", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add eeprom_fru %S %p"
 +SUBSYSTEM=="i2c", KERNEL=="6-0050", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm eeprom_fru %S %p"
 +SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add eeprom_bmc %S %p"
 +SUBSYSTEM=="i2c", KERNEL=="6-0055", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm eeprom_bmc %S %p"
-+
-diff -ruN a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules
---- a/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/71-mlxbw-hwmon-events.rules	2019-08-26 15:27:48.565207000 -0400
-@@ -0,0 +1,65 @@
-+########################################################################
-+# Copyright (c) 2019 Mellanox Technologies.
-+# Copyright (c) 2019 Diane Lynch <dianel@mellanox.com>
-+#
-+# Licensed under the GNU General Public License Version 2
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License as published by
-+# the Free Software Foundation; either version 2 of the License, or
-+# (at your option) any later version.
-+#
 +# Temp Sensors
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_inlet %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_inlet %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci_inlet %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci_inlet %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add qsfp_inlet %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm qsfp_inlet %S %p"
++ENV{EMC1424_DEV}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a340.i2c-bus/i2c-8/8-006c/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_inlet %S %E{EMC1424_DEV}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_inlet %S %E{EMC1424_DEV}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci_inlet %S %E{EMC1424_DEV}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci_inlet %S %E{EMC1424_DEV}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add qsfp_inlet %S %E{EMC1424_DEV}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm qsfp_inlet %S %E{EMC1424_DEV}"
 +# VRD sensors
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a400.i2c-bus/i2c-11/11-0058/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add vrd %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a400.i2c-bus/i2c-11/11-0058/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm vrd %S %p"
++ENV{VRD}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a400.i2c-bus/i2c-11/11-0058/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add vrd %S %E{VRD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm vrd %S %E{VRD}"
 +# fans
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a480.i2c-bus/i2c-13/13-002f/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a480.i2c-bus/i2c-13/13-002f/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan %S %p"
++ENV{FAN}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a480.i2c-bus/i2c-13/13-002f/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan %S %E{FAN}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan %S %E{FAN}"
 +# regulators
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001b/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_serdes_1p2v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001b/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_serdes_1p2v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001f/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_ddr_0p9v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001f/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_ddr_0p9v %S %p"
++ENV{BF_SERDES_1P2V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001b/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_serdes_1p2v %S %E{BF_SERDES_1P2V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_serdes_1p2v %S %E{BF_SERDES_1P2V}"
++ENV{BF_DDR_0P9V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-001f/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_ddr_0p9v %S %E{BF_DDR_0P9V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_ddr_0p9v %S %E{BF_DDR_0P9V}"
 +# PCI current monitors
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_12v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_12v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0041/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_3p3v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0041/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_3p3v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0044/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_12v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0044/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_12v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0045/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_3p3v %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0045/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_3p3v %S %p"
++ENV{PCI0_12V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0040/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_12v %S %E{PCI0_12V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_12v %S %E{PCI0_12V}"
++ENV{PCI0_3P3V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0041/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci0_3p3v %S %E{PCI0_3P3V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci0_3p3v %S %E{PCI0_3P3V}"
++ENV{PCI1_12V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0044/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_12v %S %E{PCI1_12V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_12v %S %E{PCI1_12V}"
++ENV{PCI1_3P3V}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a300.i2c-bus/i2c-7/7-0045/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pci1_3p3v %S %E{PCI1_3P3V}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pci1_3p3v %S %E{PCI1_3P3V}"
 +#MB Voltage monitor
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0020/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add mb_vmon %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0020/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm mb_vmon %S %p"
++ENV{MB_VMON}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0020/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add mb_vmon %S %E{MB_VMON}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm mb_vmon %S %E{MB_VMON}"
 +# Bluefield voltage monitor
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0021/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_vmon %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0021/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_vmon %S %p"
++ENV{BF_VMON}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a3c0.i2c-bus/i2c-10/10-0021/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_vmon %S %E{BF_VMON}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_vmon %S %E{BF_VMON}"
 +#resets
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_hard_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_hard_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_rs232_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_rs232_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add usb_phy_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm usb_phy_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add jtag_cs_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm jtag_cs_reset %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add clk_gen_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm clk_gen_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan_ctl_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan_ctl_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_bmc_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_bmc_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_skt_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_skt_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pwr_ctl_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pwr_ctl_sel %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fans_force_max %S %p"
-+SUBSYSTEM=="hwmon", DEVPATH=="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %p"
++ENV{MLXCPLD}="/devices/platform/ahb/ahb:apb/ahb:apb:i2c@1e78a000/1e78a140.i2c-bus/i2c-4/4-0040/hwmon/hwmon*"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_hard_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_hard_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add bf_rs232_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm bf_rs232_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add usb_phy_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm usb_phy_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add jtag_cs_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm jtag_cs_reset %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add clk_gen_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm clk_gen_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fan_ctl_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fan_ctl_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_bmc_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_bmc_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pcie_skt_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pcie_skt_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add pwr_ctl_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm pwr_ctl_sel %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="add", RUN+="/usr/bin/mlxbw-hw-events.sh add fans_force_max %S %E{MLXCPLD}"
++SUBSYSTEM=="i2c", ACTION=="remove", RUN+="/usr/bin/mlxbw-hw-events.sh rm fans_force_max %S %E{MLXCPLD}"
 diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 --- a/lanserv/mlxbw/lancontrol	1969-12-31 19:00:00.000000000 -0500
 +++ b/lanserv/mlxbw/lancontrol	2019-08-26 15:27:48.568213000 -0400
@@ -1027,8 +1017,8 @@ diff -ruN a/lanserv/mlxbw/lancontrol b/lanserv/mlxbw/lancontrol
 +esac
 diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 --- a/lanserv/mlxbw/Makefile.am	1969-12-31 19:00:00.000000000 -0500
-+++ b/lanserv/mlxbw/Makefile.am	2019-08-26 15:27:48.570207000 -0400
-@@ -0,0 +1,24 @@
++++ b/lanserv/mlxbw/Makefile.am	2020-04-02 15:40:21.938676000 -0400
+@@ -0,0 +1,23 @@
 +AM_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/lanserv
 +pkglib_LTLIBRARIES = mlxbw.la
 +
@@ -1043,8 +1033,7 @@ diff -ruN a/lanserv/mlxbw/Makefile.am b/lanserv/mlxbw/Makefile.am
 +	$(INSTALL) -m 775 $(srcdir)/lancontrol "$(DESTDIR)$(sysconfdir)/ipmi/"; \
 +	$(INSTALL) -m 644 $(srcdir)/sdr.20.main "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
 +	$(INSTALL) -m 775 $(srcdir)/sel_set_log_size.sh "$(DESTDIR)$(bindir)"; \
-+	$(INSTALL) -m 775 $(srcdir)/71-mlxbw-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
-+	$(INSTALL) -m 775 $(srcdir)/71-mlxbw-hwmon-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
++	$(INSTALL) -m 775 $(srcdir)/10-mlxbw-events.rules "$(DESTDIR)$(localstatedir)/mlx_ipmid/mlxbw/"; \
 +	$(INSTALL) -m 775 $(srcdir)/mlxbw-hw-events.sh "$(DESTDIR)$(bindir)";
 +
 +uninstall-local:
