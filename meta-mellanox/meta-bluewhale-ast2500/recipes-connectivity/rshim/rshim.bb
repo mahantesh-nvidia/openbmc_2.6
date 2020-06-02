@@ -14,7 +14,7 @@ S = "${WORKDIR}/git"
 
 SRC_URI = "git://github.com/Mellanox/rshim-user-space.git;protocol=https;branch=master"
 
-SRCREV = "e0653ef1b6aa7cba1d8ab0c69c33921d49fab46f"
+SRCREV = "3e9c49488464607510cc8a12e415029ab7d4a3d9"
 
 EXTRA_OECONF = "--enable-pcie=no"
 
