@@ -1,0 +1,32 @@
+--- a/src/HwmonTempMain.cpp
++++ b/src/HwmonTempMain.cpp
+@@ -29,9 +29,10 @@
+ static constexpr bool DEBUG = false;
+ 
+ namespace fs = std::filesystem;
+-static constexpr std::array<const char*, 2> sensorTypes = {
++static constexpr std::array<const char*, 3> sensorTypes = {
+     "xyz.openbmc_project.Configuration.TMP75",
+-    "xyz.openbmc_project.Configuration.TMP421"};
++    "xyz.openbmc_project.Configuration.TMP421",
++    "xyz.openbmc_project.Configuration.EMC1424"};
+ 
+ void createSensors(
+     boost::asio::io_service& io, sdbusplus::asio::object_server& objectServer,
+@@ -138,11 +139,12 @@
+                 continue;
+             }
+ 
+-            if (sdbusplus::message::variant_ns::get<uint64_t>(
+-                    configurationBus->second) != bus ||
+-                sdbusplus::message::variant_ns::get<uint64_t>(
+-                    configurationAddress->second) != addr)
++            std::string config_busStr = sdbusplus::message::variant_ns::get<std::string>(configurationBus->second);
++            std::string config_addrStr = sdbusplus::message::variant_ns::get<std::string>(configurationAddress->second);
++            if (std::stoi(config_busStr) != bus ||
++                std::stoi(config_addrStr) != addr)
+             {
++                std::cout << "addr and bus doesn't match with entity manager config" << std::endl;
+                 continue;
+             }
+ 

@@ -1,0 +1,97 @@
+--- a/src/FruDevice.cpp
++++ b/src/FruDevice.cpp
+@@ -121,6 +121,7 @@
+ 
+         for (int ii = first; ii <= last; ii++)
+         {
++            std::vector<char> device;
+ 
+             // Set slave address
+             if (ioctl(file, I2C_SLAVE_FORCE, ii) < 0)
+@@ -166,7 +167,6 @@
+             // check the header checksum
+             if (sum == block_data[7])
+             {
+-                std::vector<char> device;
+                 device.insert(device.end(), block_data.begin(),
+                               block_data.begin() + 8);
+ 
+@@ -206,8 +206,10 @@
+                         }
+                     }
+                 }
+-                devices->emplace(ii, device);
+             }
++            // Emplace/Add the device even if FRU EEPROM not found
++	    std::cout << "Emplacing device now" << std::endl;
++            devices->emplace(ii, device);
+         }
+         return 1;
+     });
+@@ -473,30 +475,39 @@
+     uint32_t bus, uint32_t address)
+ {
+     boost::container::flat_map<std::string, std::string> formattedFru;
+-    if (!formatFru(device, formattedFru))
++    bool fru_absent = device.empty();
++    std::string productName;
++
++    if (!fru_absent && !formatFru(device, formattedFru))
+     {
+         std::cerr << "failed to format fru for device at bus " << std::hex
+                   << bus << "address " << address << "\n";
+         return;
+     }
+-    auto productNameFind = formattedFru.find("BOARD_PRODUCT_NAME");
+-    std::string productName;
+-    if (productNameFind == formattedFru.end())
+-    {
+-        productNameFind = formattedFru.find("PRODUCT_PRODUCT_NAME");
+-    }
+-    if (productNameFind != formattedFru.end())
+-    {
+-        productName = productNameFind->second;
+-        std::regex illegalObject("[^A-Za-z0-9_]");
+-        productName = std::regex_replace(productName, illegalObject, "_");
+-    }
+-    else
++
++    if (fru_absent)
+     {
+-        productName = "UNKNOWN" + std::to_string(UNKNOWN_BUS_OBJECT_COUNT);
+-        UNKNOWN_BUS_OBJECT_COUNT++;
++        productName = std::to_string(bus) + "_" + std::to_string(address);
+     }
++    else {
++        auto productNameFind = formattedFru.find("BOARD_PRODUCT_NAME");
++        if (productNameFind == formattedFru.end())
++        {
++            productNameFind = formattedFru.find("PRODUCT_PRODUCT_NAME");
++        }
++        if (productNameFind != formattedFru.end())
++        {
++            productName = productNameFind->second;
++            std::regex illegalObject("[^A-Za-z0-9_]");
++            productName = std::regex_replace(productName, illegalObject, "_");
++        }
++        else
++        {
++            productName = "UNKNOWN" + std::to_string(UNKNOWN_BUS_OBJECT_COUNT);
++            UNKNOWN_BUS_OBJECT_COUNT++;
++        }
+ 
++    }
+     productName = "/xyz/openbmc_project/FruDevice/" + productName;
+     // avoid duplicates by checking to see if on a mux
+     if (bus > 0)
+--- a/include/devices.hpp
++++ b/include/devices.hpp
+@@ -53,6 +53,8 @@
+                                   "/sys/bus/i2c/devices/i2c-$Bus/new_device")},
+          {"TMP421", ExportTemplate("tmp421 $Address",
+                                    "/sys/bus/i2c/devices/i2c-$Bus/new_device")},
++         {"EMC1424", ExportTemplate("emc1424 $Address",
++                                   "/sys/bus/i2c/devices/i2c-$Bus/new_device")},
+          {"SkylakeCPU",
+           ExportTemplate("peci-client $Address",
+                          "/sys/bus/peci/devices/peci-$Bus/new_device")

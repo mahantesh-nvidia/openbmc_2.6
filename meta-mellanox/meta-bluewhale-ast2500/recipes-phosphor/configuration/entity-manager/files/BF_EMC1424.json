@@ -1,0 +1,13 @@
+{
+    "Exposes": [
+        {
+            "Address": "108",
+            "Bus": "8",
+            "Name": "temp sensor 8",
+            "Name1": "temp sensor ext 8",
+            "Type": "EMC1424"
+        }
+    ],
+    "Name": "Bluewhale BMC card",
+    "Probe": "TRUE"
+}

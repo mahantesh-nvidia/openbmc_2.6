@@ -1,0 +1,29 @@
+--- a/src/ADCSensorMain.cpp
++++ b/src/ADCSensorMain.cpp
+@@ -68,17 +68,10 @@
+     // configuration
+     for (auto& path : paths)
+     {
+-        std::smatch match;
+-        std::string pathStr = path.string();
+-
+-        std::regex_search(pathStr, match, inputRegex);
+-        std::string indexStr = *(match.begin() + 1);
+-
+         auto directory = path.parent_path();
+         // convert to 0 based
+-        size_t index = std::stoul(indexStr) - 1;
+         auto oemNamePath =
+-            directory.string() + R"(/of_node/oemname)" + std::to_string(index);
++            directory.string() + R"(/name)";
+ 
+         if (DEBUG)
+         {
+@@ -98,7 +91,6 @@
+             // shouldn't have an empty name file
+             continue;
+         }
+-        oemName.pop_back(); // remove trailing null
+ 
+         const SensorData* sensorData = nullptr;
+         const std::string* interfacePath = nullptr;

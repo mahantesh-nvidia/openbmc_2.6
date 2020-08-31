@@ -1,0 +1,12 @@
+{
+    "Exposes": [
+        {
+            "Address": "88",
+            "Bus": "11",
+            "Name": "tps53679",
+            "Type": "ADC"
+        }
+    ],
+    "Name": "Bluewhale VRD",
+    "Probe": "TRUE"
+}
